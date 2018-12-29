@@ -1,0 +1,9 @@
+# input and output files
+*.pdf
+*.csv
+*.xls
+*.xlsx
+
+# compilation and tmp files
+*.pyc
+*~
