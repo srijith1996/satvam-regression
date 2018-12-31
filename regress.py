@@ -54,19 +54,17 @@ def regress_df(data, runs = 1000):
 
   # visualize time-series of ref data
   fig, ax = plotting.ts_plot(epochs, no2_y,
-         title='NO_2 readings from Reference monitor',
-         ylabel='NO_2 concentration (ppb)',
-         leg_labels=['NO_2 (ppb)'])
+         title=r'$ NO_2 $\textbf{ readings from Reference monitor}',
+         ylabel=r'$ NO_2 $\textit{ concentration (ppb)}',
+         leg_labels=[r'$ NO_2 $ conc (ppb)'])
 
-  fig.show()
   figs.append(fig)
 
   fig, ax = plotting.ts_plot(epochs, no2_y,
-         title='O_3 readings from Reference monitor',
-         ylabel='O_3 concentration (ppb)',
-         leg_labels=['O_3 (ppb)'])
+         title=r'$ O_3 $ \textbf{readings from Reference monitor}',
+         ylabel=r'$ O_3 $\textit{concentration (ppb)}',
+         leg_labels=['$ O_3 $ conc (ppb)'])
 
-  fig.show()
   figs.append(fig)
 
   # visualize time-series of AlphaSense sensors
@@ -81,20 +79,18 @@ def regress_df(data, runs = 1000):
 
   # TODO: Change labels based on sensor name 
   fig, ax = plotting.ts_plot(epochs, no2_op1_vals,
-         title='NO_2 Output1 from AlphaSense sensors',
-         ylabel='NO_2 op1 (mV)', ylim=[190, 300],
+         title=r'$ NO_2 $ \textbf{Output1 from AlphaSense sensors}',
+         ylabel=r'$ NO_2 $ \textit{op1 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
 
-  fig.show()
   figs.append(fig)
 
   # visualize time-series of AlphaSense sensors
   fig, ax = plotting.ts_plot(epochs, no2_op2_vals,
-         title='NO_2 Output2 from AlphaSense sensors',
-         ylabel='NO_2 op2 (mV)', ylim=[190, 300],
+         title=r'$ NO_2 $ \textbf{Output2 from AlphaSense sensors}',
+         ylabel=r'$ NO_2 $ \textit{op2 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
 
-  fig.show()
   figs.append(fig)
 
   for (i, sens_ox) in enumerate(ox_x):
@@ -103,20 +99,18 @@ def regress_df(data, runs = 1000):
 
   # TODO: Change labels based on sensor name 
   fig, ax = plotting.ts_plot(epochs, ox_op1_vals,
-         title='OX (NO_2 + O_3) Output1 from AlphaSense sensors',
-         ylabel='OX op1 (mV)', ylim=[190, 300],
+         title=r'$ OX (NO_2 + O_3) $ \textbf{Output 1 from AlphaSense sensors}',
+         ylabel=r'$ OX $ \textit{op1 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
 
-  fig.show()
   figs.append(fig)
 
   # visualize time-series of AlphaSense sensors
   fig, ax = plotting.ts_plot(epochs, ox_op2_vals,
-         title='OX (NO_2 + O_3) Output2 from AlphaSense sensors',
-         ylabel='OX op2 (mV)', ylim=[190, 300],
+         title=r'$ OX (NO_2 + O_3) $ \textbf{Output 2 from AlphaSense sensors}',
+         ylabel=r'$ OX $ \textit{op2 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
 
-  fig.show()
   figs.append(fig)
 
 
@@ -189,87 +183,80 @@ def regress_df(data, runs = 1000):
     ylim_p = [-150, 50]
     ylim_s = [0, 45]
     fig, ax = plotting.compare_ts_plot(epochs, residuals[:, 0], temp[j],
-          title="Residual errors vs temperature (Sensor " + str(j + 1) + ")",
-          ylabel="Residuals (ppb)",
-          ylabel_s="Temperature (\deg C)", ylim_p=ylim_p,
+          title=r"\textbf{Residual errors vs temperature (Sensor " + str(j + 1) + ")}",
+          ylabel=r"\textit{Residuals (ppb)}",
+          ylabel_s=r"\textit{Temperature} ($ ^{\circ} $C)", ylim_p=ylim_p,
           ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
   
     # compute r^2 between residual and temperature
     p = np.polyfit(temp[j].astype(float), residuals[:, 0].astype(float), 1)
-    print (np.corrcoef(temp[j].astype(float),
-        residuals[:, 0].astype(float))[0,1])
     r2 = (np.corrcoef(temp[j].astype(float),
         residuals[:, 0].astype(float))[0,1])
   
-    plot_str = "rs = %.3f * T + %.3f" % (p[0], p[1])
-    plot_str2 = "R^2 = %.4f" % r2
-    ax.text((epochs[-1] + epochs[0])/2, (9*ylim_p[0] + ylim_p[1])/10,
+    plot_str = "$ E = %.3f * T + %.3f $" % (p[0], p[1])
+    plot_str2 = "$ R^2 = %.4f $" % r2
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str, ha="center", va="bottom")
-    ax.text((epochs[-1] + epochs[0])/2, (9*ylim_p[0] + ylim_p[1])/10,
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str2, ha="center", va="top")
     
     figs.append(fig)
-    fig.show()
     
     # plot autocorrelation of residuals
     fig = plt.figure()
     ax = autocorrelation_plot(pd.Series(residuals[:,0]))
     plotting.set_plot_labels(ax, title="Autocorrelation of residuals",
-        xlabel="Lag", ylabel="Autocorrelation")
+        xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
     ax.set_xlim(0, 250)
 
     figs.append(fig)
-    fig.show()
   
     # plot regression surface
     fig = plotting.plot_reg_plane(no2_x_train, no2_y_train,
                      [reg.intercept_, reg.coef_[0], reg.coef_[1]],
-                     title='Outputs vs. ppb on training set',
-                     xlabel='sensor output WE (mV)',
-                     ylabel='sensor output AE (mV)',
-                     zlabel='NO2 concentration (ppb)')
+                     title=r'\textbf{Outputs vs. ppb on training set}',
+                     xlabel=r'\textbf{sensor output WE (mV)}',
+                     ylabel=r'\textbf{sensor output AE (mV)}',
+                     zlabel=r'\textit{NO2 concentration (ppb)}')
     figs.append(fig)
-    fig.show()
 
     fig = plotting.plot_reg_plane(no2_x_test, no2_y_test,
                      [reg.intercept_, reg.coef_[0], reg.coef_[1]],
-                     title='Outputs vs. ppb on test set',
-                     xlabel='sensor output WE (mV)',
-                     ylabel='sensor output AE (mV)',
-                     zlabel='NO2 concentration (ppb)')
+                     title=r'\textbf{Outputs vs. ppb on test set}',
+                     xlabel=r'\textbf{sensor output WE (mV)}',
+                     ylabel=r'\textbf{sensor output AE (mV)}',
+                     zlabel=r'\textit{NO2 concentration (ppb)}')
     figs.append(fig)
-    fig.show()
 
     #fig = plotting.plot_violin(residuals,
     #       title="Violin-plot of residual errors from multifold regression",
     #       xlabel="Runs", ylabel="Residual error", scale=[-50, 50])
 
     #figs.append(fig)
-    #fig.show()
 
   # compare violins of each sensor
   coeffs = np.array(coeffs)
 
   fig = plotting.plot_violin(coeffs[:, :, 0].T,
-      title="Coefficient of sensor output 1 from multifold regression",
-      ylabel="Coefficient of sensor-output 1 (ppb/mV)", xlabel="Sensors")
+      title=r"\textbf{Coefficient of sensor output 1 from multifold regression}",
+      ylabel=r"\textit{Coefficient of sensor-output 1 (ppb/mV)}",
+      xlabel=r"\textbf{Sensors}")
 
   figs.append(fig)
-  fig.show()
 
   fig = plotting.plot_violin(coeffs[:, :, 1].T,
-      title="Coefficient of sensor output 2 from multifold regression",
-      ylabel="Coefficient of sensor-output 2 (ppb/mV)", xlabel="Sensors")
+      title=r"\textbf{Coefficient of sensor output 2 from multifold regression}",
+      ylabel=r"\textit{Coefficient of sensor-output 2 (ppb/mV)}",
+      xlabel=r"\textbf{Sensors}")
   
   figs.append(fig)
-  fig.show()
 
   fig = plotting.plot_violin(coeffs[:, :, 2].T,
-      title="Constant term from multifold regression",
-      ylabel="Constant term (ppb)", xlabel="Sensors")
+      title=r"\textbf{Constant term from multifold regression}",
+      ylabel=r"\textit{Constant term (ppb)}",
+      xlabel=r"\textbf{Sensors}")
   
   figs.append(fig)
-  fig.show()
 
   return figs
 # ----------------------------------------------------------------------------------

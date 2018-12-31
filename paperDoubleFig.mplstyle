@@ -1,12 +1,16 @@
 xtick.labelsize: 13
 ytick.labelsize: 13
 font.size: 13
+font.family: serif
+font.serif: Times, Palatino, New Centure Schoolbook, Bookman, Computer Modern Roman
+font.sans-serif: Helvetica, Avant Garde, Computer Modern Sans serif
+font.cursive: Zapf Chancery
+font.monospace: Courier, Computer Modern Typewriter
+text.usetex: True
 figure.autolayout: True
-figure.figsize: 7.2,4.45
+figure.figsize: 11,7
 axes.titlesize: 17
 axes.labelsize: 15
 lines.linewidth: 2
 lines.markersize: 6
 legend.fontsize: 13
-mathtext.fontset: stix
-font.family: STIXGeneral

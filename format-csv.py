@@ -19,6 +19,7 @@ from datetime import timedelta
 import time
 import regress
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 # -------------------------------------------------------------------------------------------------------
 # configurables
 STEP_SIZE_TS = 60                     # desired granularity of data input
@@ -68,6 +69,7 @@ for (i, src_file) in enumerate(SENSOR_FILE_LIST):
 
   timestamps = sens_dfs[i][TIME_FIELD_HDR].values
 
+  # convert timezone to IST from Z
   for (j, timestamp) in enumerate(timestamps):
     timestamps[j] = (dt.datetime.strptime(timestamp,
         SENS_TS_FORMAT) + timedelta(hours=5, minutes=30)).strftime('%s')
@@ -82,6 +84,8 @@ for (i, src_file) in enumerate(SENSOR_FILE_LIST):
   sens_dfs[i] = sens_dfs[i][sens_dfs[i].applymap(lambda x: 
             (x != "NoData" and x != "NO_DATA"
          and x != "undefined")).all(1)].dropna()
+
+  print "Sensor %d has %d points" % (i, len(sens_dfs[i].index))
 
   min_time.append(timestamps[0])
   max_time.append(timestamps[-1])
@@ -128,6 +132,7 @@ for i in xrange(len(dates)):
   # change resolution to minutes
   times[i] -= times[i] % 60
 
+print "Reference monitor has %d points" % len(ref_df.index)
 ref_df = ref_df.drop(columns=[R_DATE_FIELD_HDR])
 
 min_time = min([times[0], min_time])
@@ -214,14 +219,22 @@ for i in xrange(NUM_SENSORS):
   aggregate_list.append(ox_op1[:, i].tolist())
   aggregate_list.append(ox_op2[:, i].tolist())
 
-target_df = pd.DataFrame(aggregate_list).transpose().dropna()
-#print target_df
+target_df = pd.DataFrame(aggregate_list).transpose()
+target_df = target_df.dropna()
+print "Data set size (after dropna()): " + str(len(target_df.index))
+print target_df
 # -------------------------------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
-figs = regress.regress_df(target_df, runs=50)
+figs = regress.regress_df(target_df, runs=5000)
 
 pdf = PdfPages("output-plots.pdf")
-for fig in range(1, len(figs)+1):
+
+# print report data
+
+# print figures
+for (i, fig) in enumerate(figs):
+  text = 'Figure %d' % (i + 1)
+  plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
 
 pdf.close()

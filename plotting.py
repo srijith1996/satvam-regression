@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 import matplotlib.patches as mpatches
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 import matplotlib as mpl
+from matplotlib import rc
 import time
 
 from matplotlib.lines import Line2D
@@ -14,6 +15,8 @@ from mpl_toolkits.mplot3d import Axes3D
 # Load style file
 plt.close('all')
 plt.style.use('paperDoubleFig.mplstyle')
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
 
 # Make some style choices for plotting
 colorWheel =['#329932',
@@ -52,6 +55,7 @@ dashesStyles = [[3,1],
 #        return 2
 # ------------------------------------------------------------------------------
 def set_plot_labels(ax, title='', xlabel='', ylabel=''):
+
   ax.set_title(title)
   ax.set_xlabel(xlabel)
   ax.set_ylabel(ylabel)
@@ -102,7 +106,7 @@ def plot_reg_plane(X, Y, coeffs, points=40,
     x = np.linspace(np.min(X), np.max(X), points)
     y = coeffs[0] + x * coeffs[1]
 
-    ax.plot(x, y, color=colorWheel[0], alpha=0.3)
+    ax.plot(x, y, color=colorWheel[0], alpha=0.6)
     ax.scatter(X, Y, color=colorWheel[1],
                alpha=0.7, marker='.',
                linewidths=0.3)
@@ -142,7 +146,7 @@ def format_x_date(fig, ax):
   fig.autofmt_xdate()
 
   ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
-  ax.set_xlabel('Time Stamp')
+  ax.set_xlabel(r'\textbf{Time}')
   plt.xticks(rotation=30)
 # ------------------------------------------------------------------------------
 def ts_plot(epochs, Y, title='', ylabel='',
@@ -173,11 +177,11 @@ def ts_plot(epochs, Y, title='', ylabel='',
 
   handles = []
   if np.size(Y) == np.shape(Y)[0]:
-    ax.plot(epochs, Y, alpha=0.5, linewidth=1.0, color=colorWheel[7])
+    ax.plot(epochs, Y, alpha=0.6, linewidth=1.0, color=colorWheel[7])
     handles.append(mpatches.Patch(color=colorWheel[7]))
   else:
     for (i, col) in enumerate(Y.T):
-      ax.plot(epochs, col, alpha=0.5,
+      ax.plot(epochs, col, alpha=0.6,
             linewidth=1.0, color=colorWheel[i%len(colorWheel)])
       handles.append(mpatches.Patch(color=colorWheel[i%len(colorWheel)]))
 
