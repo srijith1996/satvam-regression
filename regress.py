@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.patches as mpatches
 
 import time
 
@@ -51,6 +52,75 @@ def regress_df(data, runs = 1000):
     no2_x.append(data.values[:,col_no2(i)])
     ox_x.append(data.values[:,col_ox(i)])
 
+  # visualize time-series of ref data
+  fig, ax = plotting.ts_plot(epochs, no2_y,
+         title='NO_2 readings from Reference monitor',
+         ylabel='NO_2 concentration (ppb)',
+         leg_labels=['NO_2 (ppb)'])
+
+  fig.show()
+  figs.append(fig)
+
+  fig, ax = plotting.ts_plot(epochs, no2_y,
+         title='O_3 readings from Reference monitor',
+         ylabel='O_3 concentration (ppb)',
+         leg_labels=['O_3 (ppb)'])
+
+  fig.show()
+  figs.append(fig)
+
+  # visualize time-series of AlphaSense sensors
+  no2_op1_vals = np.zeros([np.shape(no2_x[0])[0], len(no2_x)])
+  no2_op2_vals = np.zeros([np.shape(no2_x[0])[0], len(no2_x)])
+  ox_op1_vals = np.zeros([np.shape(ox_x[0])[0], len(ox_x)])
+  ox_op2_vals = np.zeros([np.shape(ox_x[0])[0], len(ox_x)])
+
+  for (i, sens_no2) in enumerate(no2_x):
+    no2_op1_vals[:, i] = sens_no2[:, 0]
+    no2_op2_vals[:, i] = sens_no2[:, 1]
+
+  # TODO: Change labels based on sensor name 
+  fig, ax = plotting.ts_plot(epochs, no2_op1_vals,
+         title='NO_2 Output1 from AlphaSense sensors',
+         ylabel='NO_2 op1 (mV)', ylim=[190, 300],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
+
+  fig.show()
+  figs.append(fig)
+
+  # visualize time-series of AlphaSense sensors
+  fig, ax = plotting.ts_plot(epochs, no2_op2_vals,
+         title='NO_2 Output2 from AlphaSense sensors',
+         ylabel='NO_2 op2 (mV)', ylim=[190, 300],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
+
+  fig.show()
+  figs.append(fig)
+
+  for (i, sens_ox) in enumerate(ox_x):
+    ox_op1_vals[:, i] = sens_ox[:, 0]
+    ox_op2_vals[:, i] = sens_ox[:, 1]
+
+  # TODO: Change labels based on sensor name 
+  fig, ax = plotting.ts_plot(epochs, ox_op1_vals,
+         title='OX (NO_2 + O_3) Output1 from AlphaSense sensors',
+         ylabel='OX op1 (mV)', ylim=[190, 300],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
+
+  fig.show()
+  figs.append(fig)
+
+  # visualize time-series of AlphaSense sensors
+  fig, ax = plotting.ts_plot(epochs, ox_op2_vals,
+         title='OX (NO_2 + O_3) Output2 from AlphaSense sensors',
+         ylabel='OX op2 (mV)', ylim=[190, 300],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
+
+  fig.show()
+  figs.append(fig)
+
+
+  # process and regress data: multifold
 
   # TODO
   #we_zero_offsets = [227, 229, 222]
@@ -120,7 +190,7 @@ def regress_df(data, runs = 1000):
     ylim_s = [0, 45]
     fig, ax = plotting.compare_ts_plot(epochs, residuals[:, 0], temp[j],
           title="Residual errors vs temperature (Sensor " + str(j + 1) + ")",
-          xlabel="Time Stamp", ylabel="Residuals (ppb)",
+          ylabel="Residuals (ppb)",
           ylabel_s="Temperature (\deg C)", ylim_p=ylim_p,
           ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
   
@@ -133,9 +203,9 @@ def regress_df(data, runs = 1000):
   
     plot_str = "rs = %.3f * T + %.3f" % (p[0], p[1])
     plot_str2 = "R^2 = %.4f" % r2
-    ax.text((epochs[-1] + epochs[0])/2, (4*ylim_p[0] + ylim_p[1])/5,
+    ax.text((epochs[-1] + epochs[0])/2, (9*ylim_p[0] + ylim_p[1])/10,
             plot_str, ha="center", va="bottom")
-    ax.text((epochs[-1] + epochs[0])/2, (4*ylim_p[0] + ylim_p[1])/5,
+    ax.text((epochs[-1] + epochs[0])/2, (9*ylim_p[0] + ylim_p[1])/10,
             plot_str2, ha="center", va="top")
     
     figs.append(fig)
@@ -146,6 +216,7 @@ def regress_df(data, runs = 1000):
     ax = autocorrelation_plot(pd.Series(residuals[:,0]))
     plotting.set_plot_labels(ax, title="Autocorrelation of residuals",
         xlabel="Lag", ylabel="Autocorrelation")
+    ax.set_xlim(0, 250)
 
     figs.append(fig)
     fig.show()

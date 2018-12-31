@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 import matplotlib as mpl
 import time
@@ -141,10 +142,53 @@ def format_x_date(fig, ax):
   fig.autofmt_xdate()
 
   ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
+  ax.set_xlabel('Time Stamp')
   plt.xticks(rotation=30)
 # ------------------------------------------------------------------------------
-def compare_ts_plot(epochs, y1, y2, title='', xlabel='',
-                    ylabel='', ylabel_s='', ylim_p=None, ylim_s=None,
+def ts_plot(epochs, Y, title='', ylabel='',
+            ylim=None, leg_labels=None):
+  '''
+     Plot a time-series of columns of Y
+
+     Params:
+        epochs    : Timestamp epochs as integers
+        Y         : ndarray with axis=1 as sequences
+        title     : Plot title
+        ylabel    : y-axis label
+        ylim      : list of y axis limits [min, max]
+        leg_labels: legend labels as list
+
+     Return:
+        fig - matplotlib figure
+  '''
+
+  fig = plt.figure()
+  ax = fig.add_subplot('111')
+
+  set_plot_labels(ax, title, xlabel='', ylabel=ylabel)
+  format_x_date(fig, ax)
+
+  if ylim != None:
+    ax.set_ylim(ylim)
+
+  handles = []
+  if np.size(Y) == np.shape(Y)[0]:
+    ax.plot(epochs, Y, alpha=0.5, linewidth=1.0, color=colorWheel[7])
+    handles.append(mpatches.Patch(color=colorWheel[7]))
+  else:
+    for (i, col) in enumerate(Y.T):
+      ax.plot(epochs, col, alpha=0.5,
+            linewidth=1.0, color=colorWheel[i%len(colorWheel)])
+      handles.append(mpatches.Patch(color=colorWheel[i%len(colorWheel)]))
+
+  # legend
+  if leg_labels != None:
+    ax.legend(handles=handles, labels=leg_labels, loc=3)
+
+  return fig, ax
+# ------------------------------------------------------------------------------
+def compare_ts_plot(epochs, y1, y2, title='', ylabel='',
+                    ylabel_s='', ylim_p=None, ylim_s=None,
                     leg_labels=None):
   '''
      Plot a time-series on twin axes comparing the y1 and y2
@@ -154,7 +198,6 @@ def compare_ts_plot(epochs, y1, y2, title='', xlabel='',
       y1      : 1st sequence
       y2      : 2nd sequence
       title   : Title string of the plot
-      xlabel  : X axis label of the plot
       ylabel  : Y axis label of the plot
       ylabel_s: secondary Y axis label of the plot
       ylim_p  : set y limits for primary axis
@@ -170,7 +213,7 @@ def compare_ts_plot(epochs, y1, y2, title='', xlabel='',
   ax = fig.add_subplot('111')
   ax2 = ax.twinx()
 
-  set_plot_labels(ax, title, xlabel, ylabel)
+  set_plot_labels(ax, title, xlabel='', ylabel=ylabel)
   set_plot_labels(ax2, title='', xlabel='', ylabel=ylabel_s)
   format_x_date(fig, ax)
 
