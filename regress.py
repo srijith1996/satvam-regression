@@ -185,7 +185,7 @@ def regress_df(data, runs = 1000):
     fig, ax = plotting.compare_ts_plot(epochs, residuals[:, 0], temp[j],
           title=r"\textbf{Residual errors vs temperature (Sensor " + str(j + 1) + ")}",
           ylabel=r"\textit{Residuals (ppb)}",
-          ylabel_s=r"\textit{Temperature} ($ ^{\circ} $C)", ylim_p=ylim_p,
+          ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
           ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
   
     # compute r^2 between residual and temperature
