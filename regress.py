@@ -60,7 +60,7 @@ def regress_df(data, runs = 1000):
 
   figs.append(fig)
 
-  fig, ax = plotting.ts_plot(epochs, no2_y,
+  fig, ax = plotting.ts_plot(epochs, o3_y,
          title=r'$ O_3 $ \textbf{readings from Reference monitor}',
          ylabel=r'$ O_3 $\textit{concentration (ppb)}',
          leg_labels=['$ O_3 $ conc (ppb)'])
@@ -233,6 +233,7 @@ def regress_df(data, runs = 1000):
     #       xlabel="Runs", ylabel="Residual error", scale=[-50, 50])
 
     #figs.append(fig)
+    print "Sensor %d DONE" % (j+1)
 
   # compare violins of each sensor
   coeffs = np.array(coeffs)
@@ -256,6 +257,66 @@ def regress_df(data, runs = 1000):
       ylabel=r"\textit{Constant term (ppb)}",
       xlabel=r"\textbf{Sensors}")
   
+# ----------------------------------------------------------------------------------
+def pm_correlate(data):
+  
+  # list of all figures plotted
+  figs = []
+  
+  # remove sub-zero ppb values
+  data = data[data.applymap(lambda x: x > 0).all(1)]
+  
+  ts = data.values[:,0]
+  pm1_vals = []
+  pm25_vals = []
+  pm10_vals = []
+
+  leg_labels = []
+
+  pm25_vals.append(data.values[:, 1])
+  for i in range(2, np.size(data.values, 1), 3):
+    pm1_vals.append(data.values[:, i].tolist())
+    pm25_vals.append(data.values[:, i+1].tolist())
+    pm10_vals.append(data.values[:, i+2].tolist())
+
+    leg_labels.append('Sensor %d' % int(((i-2)/3) + 1))
+
+  pm1_vals = np.array(pm1_vals).T
+  pm25_vals = np.array(pm25_vals).T
+  pm10_vals = np.array(pm10_vals).T
+
+  fig, ax = plotting.ts_plot(ts, pm1_vals,
+    title = r'$ PM_{1.0} $ concentration',
+    ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
+    leg_labels=leg_labels)
+
+
+  figs.append(fig)
+
+  fig, ax = plotting.ts_plot(ts, pm10_vals,
+    title = r'$ PM_{10} $ concentration',
+    ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
+    leg_labels=leg_labels)
+
+
+  figs.append(fig)
+
+  leg_labels.insert(0, 'EBAM')
+
+  fig, ax = plotting.ts_plot(ts, pm25_vals,
+    title = r'$ PM_{2.5} $ concentration',
+    ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
+    leg_labels=leg_labels)
+
+  text = r'\textbf{Correlation coefficients}'
+
+  for i in range(1, np.size(pm25_vals, axis=1)):
+    text = get_corr_txt(pm25_vals[:, i].astype(float),
+        pm25_vals[:, 0].astype(float), add_title='S%d' % i)
+
+    x = i / 5.0
+    ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+
   figs.append(fig)
 
   return figs

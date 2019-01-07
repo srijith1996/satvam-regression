@@ -33,9 +33,14 @@ OXOP2_FIELD_HDR = 'o3op2'             # Header name of o3 output2 field
 TEMP_FIELD_HDR = 'temp'               # Header name of temperature field
 HUM_FIELD_HDR = 'humidity'            # Header name of humidity field
 
+PM1_FIELD_HDR = 'pm1conc'
+PM25_FIELD_HDR = 'pm25conc'
+PM10_FIELD_HDR = 'pm10conc'
+
 SENS_TS_FORMAT = '%Y-%m-%dT%H:%M:%S.000Z'  # Input timestamp format
 REF_TS_FORMAT = '%m/%d/%y %H:%M'
 REF_DATE_FORMAT = '%m/%d/%y'
+EBAM_TS_FORMAT = '%d-%m-%Y %H:%M'
 DES_FORMAT = '%Y/%m/%d %H:%M:%S'      # Output format
 
 #reference monitor data fields
@@ -47,8 +52,19 @@ R_TIME_FIELD_HDR = 'Time'
 R_OX_FIELD_HDR = 'OZONE'
 R_NO2_FIELD_HDR = 'NO2'
 
+# EBAM data fields
+EBAM_HEADER_ROW = 0
+EBAM_TS_FIELD_HDR = 'Time'
+#EBAM_PM1_FIELD_HDR = ''
+EBAM_PM25_FIELD_HDR = 'ConcRT (mg/m3)'
+#EBAM_PM10_FIELD_HDR = ''
+
+# input arg files
 REF_FILE = sys.argv[1]
-SENSOR_FILE_LIST = sys.argv[2:]
+EBAM_FILE = sys.argv[2]
+SENSOR_FILE_LIST = sys.argv[3:-1]
+OUT_FILE_PREFIX = sys.argv[-1]
+
 NUM_SENSORS = len(SENSOR_FILE_LIST)
 # -------------------------------------------------------------------------------------------------------
 # ---------------- PRE-PROCESS SATVAM SENSOR DATA -------------------------------------------------------
@@ -143,6 +159,40 @@ max_time = max([times[-1], max_time])
 print "DONE"
 #print ref_df
 # -------------------------------------------------------------------------------------------------------
+# ----------------- PRE-PROCESS EBAM DATA ---------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
+print "Processing EBAM data........"
+
+# TODO: Process EBAM file data
+ebam_df = pd.read_csv(EBAM_FILE, header=EBAM_HEADER_ROW)
+
+#ebam_df = ebam_df[ebam_df.applymap(lambda x:
+#            (x != "NoData" and x != "NO_DATA"
+#         and x != "RS232" and x != "CALIB_S"
+#         and x != "CALIB_Z" and x != "FAULTY"
+#         and x != "Samp<")).all(1)].dropna()
+
+print "Interpreting time stamps...."
+times = ebam_df[EBAM_TS_FIELD_HDR].values
+
+for i in xrange(len(times)):
+  times[i] = dt.datetime.strptime(times[i],
+      EBAM_TS_FORMAT).strftime('%s')
+  times[i] = int(times[i])
+    
+  # change resolution to minutes
+  times[i] -= times[i] % 60
+
+print "EBAM has %d points" % len(ebam_df.index)
+
+min_time = min([times[0], min_time])
+max_time = max([times[-1], max_time])
+
+#print min_time, max_time
+
+print "DONE"
+#print ref_df
+# -------------------------------------------------------------------------------------------------------
 # generate the time vector
 time_vec = np.arange(min_time, max_time+60, 60)
 #print time.strftime(DES_FORMAT, time.gmtime(time_vec[-1]))
@@ -154,8 +204,12 @@ ox_op1 = np.empty([len(time_vec), NUM_SENSORS])
 ox_op2 = np.empty([len(time_vec), NUM_SENSORS])
 temp = np.empty([len(time_vec), NUM_SENSORS])
 #hum = np.empty([len(time_vec), NUM_SENSORS])
+pm1 = np.empty([len(time_vec), NUM_SENSORS])
+pm25 = np.empty([len(time_vec), NUM_SENSORS])
+pm10 = np.empty([len(time_vec), NUM_SENSORS])
 
 no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:] = temp[:] = np.nan
+pm1[:] = pm25[:] = pm10[:] = np.nan
 
 print "Time-stamp aligning SATVAM sensor values...."
 for i in xrange(NUM_SENSORS):
@@ -169,6 +223,9 @@ for i in xrange(NUM_SENSORS):
   sens_oxop2 = sens_dfs[i][OXOP2_FIELD_HDR].values
   sens_temp = sens_dfs[i][TEMP_FIELD_HDR].values
   #sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
+  sens_pm1 = sens_dfs[i][PM1_FIELD_HDR].values
+  sens_pm25 = sens_dfs[i][PM25_FIELD_HDR].values
+  sens_pm10 = sens_dfs[i][PM10_FIELD_HDR].values
 
   # align to time_vec
   for j in xrange(len(sens_ts)):
@@ -178,6 +235,10 @@ for i in xrange(NUM_SENSORS):
     ox_op1[ts_index, i] = sens_oxop1[j]
     ox_op2[ts_index, i] = sens_oxop2[j]
     temp[ts_index, i] = sens_temp[j]
+
+    pm1[ts_index, i] = sens_pm1[j]
+    pm25[ts_index, i] = sens_pm25[j]
+    pm10[ts_index, i] = sens_pm10[j]
 
 #print no2_op1
 print "DONE"
@@ -206,6 +267,26 @@ print "DONE"
 #print np.shape(ref_no2)
 #print np.shape(ref_o3)
 # -------------------------------------------------------------------------------------------------------
+print "Time-stamp aligning EBAM data..."
+
+# ebam currently measures only pm2.5
+ebam_ts = ebam_df[EBAM_TS_FIELD_HDR].values
+ebam_pm1 = np.empty([len(time_vec), ])
+ebam_pm25 = np.empty([len(time_vec), ])
+ebam_pm10 = np.empty([len(time_vec), ])
+
+ebam_pm1[:] = ebam_pm25[:] = ebam_pm10[:] = np.nan
+
+for j in xrange(len(ebam_ts)):
+  ts_index = time_vec.tolist().index(ebam_ts[j])
+  #ebam_pm1[ts_index] = ebam_df[EBAM_PM1_FIELD_HDR].values[j]
+  
+  # convert to ug/m3
+  ebam_pm25[ts_index] = ebam_df[EBAM_PM25_FIELD_HDR].values[j] * 1000
+  #ebam_pm10[ts_index] = ebam_df[EBAM_PM10_FIELD_HDR].values[j]
+
+print "DONE"
+# -------------------------------------------------------------------------------------------------------
 aggregate_list = []
 
 aggregate_list.append(time_vec)
@@ -222,7 +303,6 @@ for i in xrange(NUM_SENSORS):
 target_df = pd.DataFrame(aggregate_list).transpose()
 target_df = target_df.dropna()
 print "Data set size (after dropna()): " + str(len(target_df.index))
-print target_df
 # -------------------------------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
 figs = regress.regress_df(target_df, runs=5000)
@@ -230,6 +310,53 @@ figs = regress.regress_df(target_df, runs=5000)
 pdf = PdfPages("output-plots.pdf")
 
 # print report data
+
+# print figures
+for (i, fig) in enumerate(no2_figs):
+  text = 'Figure %d' % (i + 1)
+  plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
+  pdf.savefig(fig)
+  plt.close(fig)
+
+pdf.close()
+print 'NO2 PDF ready'
+
+pdf = PdfPages(OUT_FILE_PREFIX + '-o3.pdf')
+
+# print report data
+
+# print figures
+for (i, fig) in enumerate(o3_figs):
+  text = 'Figure %d' % (i + 1)
+  plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
+  pdf.savefig(fig)
+  plt.close(fig)
+
+pdf.close()
+print 'O3 PDF ready'
+# -------------------------------------------------------------------------------------------------------
+# ---------------------- PROCESS PM2.5 data -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------
+aggregate_list = []
+
+aggregate_list.append(time_vec)
+#aggregate_list.append(ebam_pm1)
+aggregate_list.append(ebam_pm25)
+#aggregate_list.append(ebam_pm10)
+
+for i in xrange(NUM_SENSORS):
+  aggregate_list.append(pm1[:, i].tolist())
+  aggregate_list.append(pm25[:, i].tolist())
+  aggregate_list.append(pm10[:, i].tolist())
+
+target_df = pd.DataFrame(aggregate_list).transpose()
+target_df = target_df.dropna()
+
+print "Data set size for PM (after dropna()): " + str(len(target_df.index))
+# -------------------------------------------------------------------------------------------------------
+figs = regress.pm_correlate(target_df)
+
+pdf = PdfPages(OUT_FILE_PREFIX + '-pm.pdf')
 
 # print figures
 for (i, fig) in enumerate(figs):
