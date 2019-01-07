@@ -305,9 +305,9 @@ target_df = target_df.dropna()
 print "Data set size (after dropna()): " + str(len(target_df.index))
 # -------------------------------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
-figs = regress.regress_df(target_df, runs=5000)
+no2_figs, o3_figs = regress.regress_df(target_df, runs=5000)
 
-pdf = PdfPages("output-plots.pdf")
+pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')
 
 # print report data
 
@@ -365,4 +365,5 @@ for (i, fig) in enumerate(figs):
   pdf.savefig(fig)
 
 pdf.close()
+print 'PM PDF ready'
 # -------------------------------------------------------------------------------------------------------
