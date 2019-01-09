@@ -37,6 +37,9 @@ def regress_df(data, runs = 1000):
   # list of all figures plotted
   no2_figs = []
   o3_figs = []
+
+  no2_fignames = []
+  o3_fignames = []
   
   # remove sub-zero ppb values
   data = data[data.applymap(lambda x: x > 0).all(1)]
@@ -84,6 +87,7 @@ def regress_df(data, runs = 1000):
          leg_labels=[r'$ NO_2 $ conc (ppb)'])
 
   no2_figs.append(fig)
+  no2_fignames.append('no2-ref.svg')
 
   fig, ax = plotting.ts_plot(epochs, o3_y,
          title=r'$ O_3 $ \textbf{readings from Reference monitor}',
@@ -91,6 +95,7 @@ def regress_df(data, runs = 1000):
          leg_labels=['$ O_3 $ conc (ppb)'])
 
   o3_figs.append(fig)
+  o3_fignames.append('o3-ref.svg')
 
   # visualize time-series of AlphaSense sensors
   no2_op1_vals = np.zeros([np.shape(no2_x[0])[0], len(no2_x)])
@@ -109,6 +114,7 @@ def regress_df(data, runs = 1000):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
 
   no2_figs.append(fig)
+  no2_fignames.append('no2-op1.svg')
 
   # visualize time-series of AlphaSense sensors
   fig, ax = plotting.ts_plot(epochs, no2_op2_vals,
@@ -117,6 +123,7 @@ def regress_df(data, runs = 1000):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
 
   no2_figs.append(fig)
+  no2_fignames.append('no2-op2.svg')
 
   for (i, sens_ox) in enumerate(ox_x):
     ox_op1_vals[:, i] = sens_ox[:, 0]
@@ -129,6 +136,7 @@ def regress_df(data, runs = 1000):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
 
   o3_figs.append(fig)
+  o3_fignames.append('o3-op1.svg')
 
   # visualize time-series of AlphaSense sensors
   fig, ax = plotting.ts_plot(epochs, ox_op2_vals,
@@ -137,6 +145,7 @@ def regress_df(data, runs = 1000):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
 
   o3_figs.append(fig)
+  o3_fignames.append('o3-op2.svg')
 
 
   # process and regress data: multifold
@@ -224,7 +233,8 @@ def regress_df(data, runs = 1000):
     t_series = np.array([no2_y, predict_no2]).T
 
     fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'True and Predicted concentrations of $ NO_2 $',
+        title = r'\textbf{True and Predicted concentrations of }'
+              + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
         ylabel = r'Concentration (ppb)',
         leg_labels=['Reference conc.', 'Predicted conc.'])
 
@@ -232,12 +242,13 @@ def regress_df(data, runs = 1000):
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     no2_figs.append(fig)
+    no2_fignames.append('no2-predict-true-comp.svg')
 
     print "plotting actual and predicted values: O3"
     t_series = np.array([o3_y, predict_o3]).T
 
     fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'True and Predicted concentrations of $ O_3 $',
+        title = r'\textbf{True and Predicted concentrations of } $ O_3 $',
         ylabel = r'Concentration (ppb)',
         leg_labels=['Reference conc.', 'Predicted conc.'])
 
@@ -245,6 +256,7 @@ def regress_df(data, runs = 1000):
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     o3_figs.append(fig)
+    o3_fignames.append('o3-predict-true-comp.svg')
 
     # plot regression surface
     #print "plotting regression surface"
@@ -269,7 +281,7 @@ def regress_df(data, runs = 1000):
     ylim_p = [-150, 50]
     ylim_s = [0, 45]
     fig, ax = plotting.compare_ts_plot(epochs, resid_no2[:, 0], temp[j],
-          title=r"\textbf{Residual errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
+          title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
                + str(j + 1) + ")}",
           ylabel=r"\textit{Residuals (ppb)}",
           ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
@@ -280,21 +292,25 @@ def regress_df(data, runs = 1000):
     p = np.polyfit(temp[j].astype(float), resid_no2[:, 0].astype(float), 1)
     r2 = stats.coeff_deter(temp[j].astype(float), resid_no2[:, 0].astype(float))
   
-    plot_str = "$ E = %.3f * T + %.3f $" % (p[0], p[1])
-    plot_str2 = "$ {R^2}_{ET} = %.4f $" % r2
+    plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
+    plot_str2 = "$ {R^2}_{eT} = %.4f $" % r2
     ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str, ha="center", va="bottom")
     ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str2, ha="center", va="top")
+
+    ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.8, 0.9),
+                xycoords="axes fraction")
     
     no2_figs.append(fig)
+    no2_fignames.append('no2-res-temp-comp.svg')
     
     # plot residuals wrt time for O3
     print "plotting residual characteristics"
     ylim_p = [-150, 50]
     ylim_s = [0, 45]
     fig, ax = plotting.compare_ts_plot(epochs, resid_o3[:, 0], temp[j],
-          title=r"\textbf{Residual errors (} $ O_3 $ \textbf{) vs temperature (Sensor "
+          title=r"\textbf{Prediction errors (} $ O_3 $ \textbf{) vs temperature (Sensor "
                + str(j + 1) + ")}",
           ylabel=r"\textit{Residuals (ppb)}",
           ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
@@ -305,14 +321,18 @@ def regress_df(data, runs = 1000):
     p = np.polyfit(temp[j].astype(float), resid_o3[:, 0].astype(float), 1)
     r2 = stats.coeff_deter(temp[j].astype(float), resid_o3[:, 0].astype(float))
   
-    plot_str = "$ E = %.3f * T + %.3f $" % (p[0], p[1])
-    plot_str2 = "$ {R^2}_{ET} = %.4f $" % r2
+    plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
+    plot_str2 = "$ {R^2}_{eT} = %.4f $" % r2
     ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str, ha="center", va="bottom")
     ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
             plot_str2, ha="center", va="top")
     
+    ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.9, 0.9),
+                xycoords="axes fraction")
+    
     o3_figs.append(fig)
+    o3_fignames.append('o3-res-temp-comp.svg')
     
     # plot autocorrelation of residuals
     #print "plotting autocorrelation of residuals"
@@ -345,11 +365,15 @@ def regress_df(data, runs = 1000):
 
     print "plotting forecasted model"
     fig, ax = plotting.ts_plot(epochs, plot_var,
-          title = r'\textbf{Time-series forecasted} $ NO_2 $ \textbf{residuals}',
+          title = r'\textbf{Time-series forecasted} $ NO_2 $ \textbf{residuals: ARIMA model}',
           ylabel= r'\textit{Residual error}',
           leg_labels=['Actual error', 'Forecasted error'])
 
+    txt = get_corr_txt(plot_var[:, 1], plot_var[:, 0])
+    ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
+
     no2_figs.append(fig)
+    no2_fignames.append('no2-arima-forecast.svg')
   
     #fig = plotting.plot_violin(resid_no2,
     #       title="Violin-plot of residual errors from multifold regression",
@@ -367,6 +391,7 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
 
   no2_figs.append(fig)
+  no2_fignames.append('no2-coeff1-violin.svg')
 
   fig = plotting.plot_violin(coeffs_no2[:, :, 1].T,
       title=r"\textbf{Coefficient of sensor op2 for } $ NO_2 $",
@@ -374,6 +399,7 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
   
   no2_figs.append(fig)
+  no2_fignames.append('no2-coeff2-violin.svg')
 
   fig = plotting.plot_violin(coeffs_no2[:, :, 2].T,
       title=r"\textbf{Constant term for } $ NO_2 $",
@@ -381,6 +407,7 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
   
   no2_figs.append(fig)
+  no2_fignames.append('no2-const-violin.svg')
 
   # compare violins of each O3 sensor
   coeffs_ox = np.array(coeffs_ox)
@@ -391,6 +418,7 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
 
   o3_figs.append(fig)
+  o3_fignames.append('o3-coeff1-violin.svg')
 
   fig = plotting.plot_violin(coeffs_ox[:, :, 1].T,
       title=r"\textbf{Coefficient of sensor op2 for } $ OX $",
@@ -398,6 +426,7 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
   
   o3_figs.append(fig)
+  o3_fignames.append('o3-coeff2-violin.svg')
 
   fig = plotting.plot_violin(coeffs_ox[:, :, 2].T,
       title=r"\textbf{Constant term for } $ OX $",
@@ -405,8 +434,9 @@ def regress_df(data, runs = 1000):
       xlabel=r"\textbf{Sensors}")
   
   o3_figs.append(fig)
+  o3_fignames.append('o3-const-violin.svg')
 
-  return no2_figs, o3_figs
+  return no2_figs, no2_fignames, o3_figs, o3_fignames
 # ----------------------------------------------------------------------------------
 def pm_correlate(data):
   

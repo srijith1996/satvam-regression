@@ -13,7 +13,7 @@
 # -------------------------------------------------------------------------------------------------------
 import pandas as pd
 import numpy as np
-import sys
+import sys, os
 import datetime as dt
 from datetime import timedelta
 import time
@@ -64,6 +64,12 @@ REF_FILE = sys.argv[1]
 EBAM_FILE = sys.argv[2]
 SENSOR_FILE_LIST = sys.argv[3:-1]
 OUT_FILE_PREFIX = sys.argv[-1]
+DIR_PREFIX = sys.argv[-1] + '/'
+
+try:
+  os.stat(DIR_PREFIX)
+except:
+  os.makedirs(DIR_PREFIX)
 
 NUM_SENSORS = len(SENSOR_FILE_LIST)
 # -------------------------------------------------------------------------------------------------------
@@ -305,7 +311,8 @@ target_df = target_df.dropna()
 print "Data set size (after dropna()): " + str(len(target_df.index))
 # -------------------------------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
-no2_figs, o3_figs = regress.regress_df(target_df, runs=5000)
+no2_figs, no2_fignames, o3_figs, o3_fignames = regress.regress_df(target_df, runs=5000)
+#pages = pdfpublish.generate_text()
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')
 
@@ -316,6 +323,7 @@ for (i, fig) in enumerate(no2_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
+  fig.savefig(DIR_PREFIX + no2_fignames[i], format='svg')
   plt.close(fig)
 
 pdf.close()
@@ -330,6 +338,7 @@ for (i, fig) in enumerate(o3_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
+  fig.savefig(DIR_PREFIX + o3_fignames[i], format='svg')
   plt.close(fig)
 
 pdf.close()
