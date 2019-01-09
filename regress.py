@@ -58,6 +58,9 @@ def regress_df(data, runs = 1000):
   temp = []
   ox_x = []
 
+  no2_y_pred = []
+  o3_y_pred = []
+
   # column locations for no2, ox and temperature data of the ith sensor
   col_skip = 3
   col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
@@ -228,6 +231,9 @@ def regress_df(data, runs = 1000):
       coeffs_no2[j].append([reg_no2.coef_[0], reg_no2.coef_[1], reg_no2.intercept_])
       coeffs_ox[j].append([reg_ox.coef_[0], reg_ox.coef_[1], reg_ox.intercept_])
 
+    no2_y_pred.append(predict_no2)
+    o3_y_pred.append(predict_o3)
+
     # plot predicted vs. true ppb
     print "plotting actual and predicted values: NO2"
     t_series = np.array([no2_y, predict_no2]).T
@@ -242,7 +248,7 @@ def regress_df(data, runs = 1000):
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     no2_figs.append(fig)
-    no2_fignames.append('no2-predict-true-comp.svg')
+    no2_fignames.append('no2-sens%d-predict-true-comp.svg' % (j+1))
 
     print "plotting actual and predicted values: O3"
     t_series = np.array([o3_y, predict_o3]).T
@@ -256,7 +262,7 @@ def regress_df(data, runs = 1000):
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     o3_figs.append(fig)
-    o3_fignames.append('o3-predict-true-comp.svg')
+    o3_fignames.append('o3-sens%d-predict-true-comp.svg' % (j+1))
 
     # plot regression surface
     #print "plotting regression surface"
@@ -303,7 +309,7 @@ def regress_df(data, runs = 1000):
                 xycoords="axes fraction")
     
     no2_figs.append(fig)
-    no2_fignames.append('no2-res-temp-comp.svg')
+    no2_fignames.append('no2-sens%d-res-temp-comp.svg' % (j+1))
     
     # plot residuals wrt time for O3
     print "plotting residual characteristics"
@@ -332,7 +338,7 @@ def regress_df(data, runs = 1000):
                 xycoords="axes fraction")
     
     o3_figs.append(fig)
-    o3_fignames.append('o3-res-temp-comp.svg')
+    o3_fignames.append('o3-sens%d-res-temp-comp.svg' % (j+1))
     
     # plot autocorrelation of residuals
     #print "plotting autocorrelation of residuals"
@@ -373,7 +379,7 @@ def regress_df(data, runs = 1000):
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
 
     no2_figs.append(fig)
-    no2_fignames.append('no2-arima-forecast.svg')
+    no2_fignames.append('no2-sens%d-arima-forecast.svg' % (j+1))
   
     #fig = plotting.plot_violin(resid_no2,
     #       title="Violin-plot of residual errors from multifold regression",
@@ -381,6 +387,35 @@ def regress_df(data, runs = 1000):
 
     #figs.append(fig)
     print "Sensor %d DONE" % (j+1)
+
+
+  # plot comparison of predicted values
+  no2_y_pred = np.array(no2_y_pred).T
+  o3_y_pred = np.array(o3_y_pred).T
+
+  # TODO: Make legend labels more generic
+  fig, ax = plotting.ts_plot(epochs, no2_y_pred,
+        title = r'\textbf{Comparison of } $ NO_2 $ \textbf{ predictions from SATVAM sensors}',
+        ylabel= r'\textit{Concentration of } $ NO_2 $  (ppb)',
+        leg_labels=['Sensor 1', 'Sensor 2'])
+  
+  txt = get_corr_txt(no2_y_pred[:, 0], no2_y_pred[:, 1])
+  ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
+
+  no2_figs.append(fig)
+  no2_fignames.append('no2-predicted-comp.svg')
+
+  # TODO: Make legend labels more generic
+  fig, ax = plotting.ts_plot(epochs, o3_y_pred,
+        title = r'\textbf{Comparison of } $ O_3 $ \textbf{ predictions from SATVAM sensors}',
+        ylabel= r'\textit{Concentration of } $ O_3 $  (ppb)',
+        leg_labels=['Sensor 1', 'Sensor 2'])
+  
+  txt = get_corr_txt(o3_y_pred[:, 0], o3_y_pred[:, 1])
+  ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
+
+  o3_figs.append(fig)
+  o3_fignames.append('o3-predicted-comp.svg')
 
   # compare violins of each NO2 sensor
   coeffs_no2 = np.array(coeffs_no2)
