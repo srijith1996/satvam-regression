@@ -90,7 +90,7 @@ elif DEPLOY_SITE == 'mpcb':
   R_PM25_FIELD_HDR = 'PM25 [ug/m3]'
   R_PM10_FIELD_HDR = 'PM10 [ug/m3]'
 
-  REF_TS_FORMAT = '%d-%m-%y %H:%M'
+  REF_TS_FORMAT = '%d-%m-%Y %H:%M'
 
   SENSOR_FILE_LIST = sys.argv[2:-1]
 
@@ -163,7 +163,7 @@ ref_df = ref_df[ref_df.applymap(lambda x:
             (x != "NoData" and x != "NO_DATA"
          and x != "RS232" and x != "CALIB_S"
          and x != "CALIB_Z" and x != "FAULTY"
-         and x != "Samp<")).all(1)].dropna()
+         and x != "Samp<" and x != "MAINT")).all(1)].dropna()
 
 # clean up time values that are 24:00
 for index, row in ref_df.iterrows():
@@ -176,7 +176,7 @@ for index, row in ref_df.iterrows():
           REF_DATE_FORMAT)
 
     elif DEPLOY_SITE == 'mpcb':
-      row[R_TIME_FIELD_HDR][-5:] = '00:00'
+      row[R_TIME_FIELD_HDR] = row[R_TIME_FIELD_HDR][:-5] + '00:00'
       row[R_TIME_FIELD_HDR] = dt.datetime.strptime(
           row[R_TIME_FIELD_HDR], REF_TS_FORMAT) + timedelta(days=1)
       row[R_TIME_FIELD_HDR] = dt.datetime.strftime(row[R_TIME_FIELD_HDR],
@@ -188,14 +188,12 @@ times = ref_df[R_TIME_FIELD_HDR].values
 if DEPLOY_SITE == 'mru':
   dates = ref_df[R_DATE_FIELD_HDR].values
 
-for i in xrange(len(dates)):
+for i in xrange(len(times)):
 
   if DEPLOY_SITE == 'mru':
-    times[i] = dt.datetime.strptime(dates[i] + ' ' + times[i],
-        REF_TS_FORMAT).strftime('%s')
-  elif DEPLOY_SITE == 'mpcb':
-    times[i] = dt.datetime.strptime(times[i], REF_TS_FORMAT).stftime('%s')
+    times[i] = dates[i] + ' ' + times[i]
 
+  times[i] = dt.datetime.strptime(times[i], REF_TS_FORMAT).strftime('%s')
   times[i] = int(times[i])
 
   # change resolution to minutes
