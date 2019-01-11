@@ -111,8 +111,7 @@ print "Processing SATVAM data........"
 
 # list of dataframes for each mote
 sens_dfs = []
-min_time = []
-max_time = []
+min_time = max_time = 0
 
 print "Interpreting time stamps......"
 for (i, src_file) in enumerate(SENSOR_FILE_LIST):
@@ -141,12 +140,17 @@ for (i, src_file) in enumerate(SENSOR_FILE_LIST):
 
   print "Sensor %d has %d points" % (i, len(sens_dfs[i].index))
 
-  min_time.append(timestamps[0])
-  max_time.append(timestamps[-1])
+  # first iteration
+  if i == 0:
+    min_time = timestamps[0]
+    max_time = timestamps[-1]
 
-# find the minimum and maximum epochs
-min_time = np.min(min_time)
-max_time = np.max(max_time)
+  # find the minimum and maximum epochs
+  if min_time > timestamps[0]:
+    min_time = timestamps[0]
+  if max_time < timestamps[-1]:
+    min_time = timestamps[-1]
+
 #min_time -= min_time % 60
 #max_time -= (max_time % 60) + 60
 
