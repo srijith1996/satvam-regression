@@ -477,6 +477,7 @@ def pm_correlate(data):
   
   # list of all figures plotted
   figs = []
+  fignames = []
   
   # remove sub-zero ppb values
   data = data[data.applymap(lambda x: x > 0).all(1)]
@@ -507,6 +508,7 @@ def pm_correlate(data):
 
 
   figs.append(fig)
+  fignames.append('pm1-comp.svg')
 
   fig, ax = plotting.ts_plot(ts, pm10_vals,
     title = r'$ PM_{10} $ concentration',
@@ -515,6 +517,7 @@ def pm_correlate(data):
 
 
   figs.append(fig)
+  fignames.append('pm10-comp.svg')
 
   leg_labels.insert(0, 'EBAM')
 
@@ -533,6 +536,7 @@ def pm_correlate(data):
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
+  fignames.append('pm25-comp.svg')
 
-  return figs
+  return figs, fignames
 # ----------------------------------------------------------------------------------
