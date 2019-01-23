@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.patches as mpatches
+from mpl_toolkits.axes_grid.inset_locator import inset_axes
 from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
 import matplotlib as mpl
 from matplotlib import rc
@@ -314,6 +315,39 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
 
   ax.legend(custom_lines, ['Mean', 'Median'],shadow='True',
             fontsize=13,ncol=1,loc='upper left')  
+
+  return fig
+# ------------------------------------------------------------------------------
+def plot_hist(ax, v, bins=20, title=''):
+  '''
+    Plot the histogram of samples in v
+  '''
+
+  for (i, col) in enumerate(v.T):
+    n, out_bins, patches = ax.hist(v[:,i], bins, density=True,
+         facecolor=colorWheel[i], alpha=0.6)
+  set_plot_labels(ax, title='', xlabel=title, ylabel='')
+
+# ------------------------------------------------------------------------------
+def inset_hist_fig(fig, outer_ax, v, size, loc):
+  '''
+    Inset histogram into the outer_ax at location.
+
+    Params:
+      fig       - figure
+      outer_ax  - Main axes
+      v         - array of values
+      size      - percent of parent fig size [width, height]
+      loc       - quadrant location
+
+    Return:
+      fig - The main figure with inset figure
+  '''
+
+  in_axes = inset_axes(outer_ax, width=size[0],
+          height=size[1], loc=loc)
+
+  plot_hist(in_axes, v, bins=200, title=r'Distribution')
 
   return fig
 # ------------------------------------------------------------------------------

@@ -116,6 +116,8 @@ def regress_df(data, runs = 1000):
          ylabel=r'$ NO_2 $ \textit{op1 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
 
+  fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals, ['35%', '35%'], 1)
+
   no2_figs.append(fig)
   no2_fignames.append('no2-op1.svg')
 
@@ -124,6 +126,8 @@ def regress_df(data, runs = 1000):
          title=r'$ NO_2 $ \textbf{Output2 from AlphaSense sensors}',
          ylabel=r'$ NO_2 $ \textit{op2 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
+
+  fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals, ['35%', '35%'], 1)
 
   no2_figs.append(fig)
   no2_fignames.append('no2-op2.svg')
@@ -138,6 +142,8 @@ def regress_df(data, runs = 1000):
          ylabel=r'$ OX $ \textit{op1 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
 
+  fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals, ['35%', '35%'], 1)
+
   o3_figs.append(fig)
   o3_fignames.append('o3-op1.svg')
 
@@ -146,6 +152,8 @@ def regress_df(data, runs = 1000):
          title=r'$ OX (NO_2 + O_3) $ \textbf{Output 2 from AlphaSense sensors}',
          ylabel=r'$ OX $ \textit{op2 (mV)}', ylim=[190, 300],
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
+
+  fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals, ['35%', '35%'], 1)
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op2.svg')
