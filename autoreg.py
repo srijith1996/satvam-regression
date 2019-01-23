@@ -248,10 +248,10 @@ if DEPLOY_SITE == 'mru':
   #print min_time, max_time
   
   print "DONE"
-  #print ref_df
 # -------------------------------------------------------------------------------
 # generate the time vector
 time_vec = np.arange(min_time, max_time+60, 60)
+index_ts = lambda x: (x-min_time)/60
 #print time.strftime(DES_FORMAT, time.gmtime(time_vec[-1]))
 
 # copy data for each sensor 
@@ -286,7 +286,8 @@ for i in xrange(NUM_SENSORS):
 
   # align to time_vec
   for j in xrange(len(sens_ts)):
-    ts_index = time_vec.tolist().index(sens_ts[j])
+    #ts_index = time_vec.tolist().index(sens_ts[j])
+    ts_index = index_ts(sens_ts[j])
     no2_op1[ts_index, i] = sens_no2op1[j]
     no2_op2[ts_index, i] = sens_no2op2[j]
     ox_op1[ts_index, i] = sens_oxop1[j]
@@ -313,7 +314,7 @@ ref_no2[:] = ref_o3[:] = np.nan
 ref_pm25[:] = ref_pm10[:] = np.nan
 
 for j in xrange(len(ref_ts)):
-  ts_index = time_vec.tolist().index(ref_ts[j])
+  ts_index = index_ts(ref_ts[j])
   ref_no2[ts_index] = ref_df[R_NO2_FIELD_HDR].values[j]
   ref_o3[ts_index] = ref_df[R_OX_FIELD_HDR].values[j]
 
@@ -339,7 +340,7 @@ if DEPLOY_SITE == 'mru':
   ebam_ts = ebam_df[EBAM_TS_FIELD_HDR].values
   
   for j in xrange(len(ebam_ts)):
-    ts_index = time_vec.tolist().index(ebam_ts[j])
+    ts_index = index_ts(ebam_ts[j])
     
     # convert to ug/m3
     ref_pm25[ts_index] = ebam_df[EBAM_PM25_FIELD_HDR].values[j] * 1000
