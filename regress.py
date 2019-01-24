@@ -77,8 +77,14 @@ def regress_df(data, runs = 1000):
       break
 
     temp.append(data.values[:,col_temp(i)])
-    no2_x.append(data.values[:,col_no2(i)])
-    ox_x.append(data.values[:,col_ox(i)])
+    tmp_idx = col_no2(i)
+    tmp_idx.append(col_temp(i))
+    print tmp_idx
+    no2_x.append(data.values[:,tmp_idx])
+    tmp_idx = col_ox(i)
+    tmp_idx.append(col_temp(i))
+    print tmp_idx
+    ox_x.append(data.values[:,tmp_idx])
 
   # convert o3 to ox for regression
   ox_y = o3_y + no2_y
@@ -182,14 +188,24 @@ def regress_df(data, runs = 1000):
     
       data_values = np.random.permutation(data.values)
     
-      no2_x_train = data_values[:train_size, col_no2(j)]
+      tmp_idx = col_no2(j)
+      tmp_idx.append(col_temp(j))
+      no2_x_train = data_values[:train_size, tmp_idx]
       no2_y_train = data_values[:train_size, 1]
-      no2_x_test = data_values[train_size:, col_no2(j)]
+
+      tmp_idx = col_no2(j)
+      tmp_idx.append(col_temp(j))
+      no2_x_test = data_values[train_size:, tmp_idx]
       no2_y_test = data_values[train_size:, 1]
 
-      ox_x_train = data_values[:train_size, col_ox(j)]
+      tmp_idx = col_ox(j)
+      tmp_idx.append(col_temp(j))
+      ox_x_train = data_values[:train_size, tmp_idx]
       ox_y_train = data_values[:train_size, 2] + no2_y_train
-      ox_x_test = data_values[train_size:, col_ox(j)]
+
+      tmp_idx = col_ox(j)
+      tmp_idx.append(col_temp(j))
+      ox_x_test = data_values[train_size:, tmp_idx]
       ox_y_test = data_values[train_size:, 2] + no2_y_test
   
       # TODO: subtracting zero offsets
@@ -236,8 +252,8 @@ def regress_df(data, runs = 1000):
       resid_no2[:, i] = predict_no2 - no2_y
       resid_o3[:, i] = predict_o3 - o3_y
 
-      coeffs_no2[j].append([reg_no2.coef_[0], reg_no2.coef_[1], reg_no2.intercept_])
-      coeffs_ox[j].append([reg_ox.coef_[0], reg_ox.coef_[1], reg_ox.intercept_])
+      coeffs_no2[j].append([reg_no2.coef_[0], reg_no2.coef_[1], reg_no2.coef_[2], reg_no2.intercept_])
+      coeffs_ox[j].append([reg_ox.coef_[0], reg_ox.coef_[1], reg_ox.coef_[2], reg_ox.intercept_])
 
     no2_y_pred.append(predict_no2)
     o3_y_pred.append(predict_o3)
@@ -445,6 +461,14 @@ def regress_df(data, runs = 1000):
   no2_fignames.append('no2-coeff2-violin.svg')
 
   fig = plotting.plot_violin(coeffs_no2[:, :, 2].T,
+      title=r"\textbf{Coefficient of temperature for } $ NO_2 $",
+      ylabel=r"\textit{Coefficient of temperature}",
+      xlabel=r"\textbf{Sensors}")
+  
+  no2_figs.append(fig)
+  no2_fignames.append('no2-coeff3-violin.svg')
+
+  fig = plotting.plot_violin(coeffs_no2[:, :, 3].T,
       title=r"\textbf{Constant term for } $ NO_2 $",
       ylabel=r"\textit{Constant term (ppb)}",
       xlabel=r"\textbf{Sensors}")
@@ -472,6 +496,14 @@ def regress_df(data, runs = 1000):
   o3_fignames.append('o3-coeff2-violin.svg')
 
   fig = plotting.plot_violin(coeffs_ox[:, :, 2].T,
+      title=r"\textbf{Coefficient of temperature for } $ OX $",
+      ylabel=r"\textit{Coefficient of temperature}",
+      xlabel=r"\textbf{Sensors}")
+  
+  no2_figs.append(fig)
+  no2_fignames.append('o3-coeff3-violin.svg')
+
+  fig = plotting.plot_violin(coeffs_ox[:, :, 3].T,
       title=r"\textbf{Constant term for } $ OX $",
       ylabel=r"\textit{Constant term (ppb)}",
       xlabel=r"\textbf{Sensors}")
