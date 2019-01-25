@@ -95,6 +95,8 @@ def regress_df(data, runs = 1000):
          ylabel=r'$ NO_2 $\textit{ concentration (ppb)}',
          leg_labels=[r'$ NO_2 $ conc (ppb)'])
 
+  fig = plotting.inset_hist_fig(fig, ax, no2_y, ['35%', '35%'], 1)
+
   no2_figs.append(fig)
   no2_fignames.append('no2-ref.svg')
 
@@ -102,6 +104,8 @@ def regress_df(data, runs = 1000):
          title=r'$ O_3 $ \textbf{readings from Reference monitor}',
          ylabel=r'$ O_3 $\textit{concentration (ppb)}',
          leg_labels=['$ O_3 $ conc (ppb)'])
+
+  fig = plotting.inset_hist_fig(fig, ax, o3_y, ['35%', '35%'], 1)
 
   o3_figs.append(fig)
   o3_fignames.append('o3-ref.svg')
@@ -500,8 +504,8 @@ def regress_df(data, runs = 1000):
       ylabel=r"\textit{Coefficient of temperature}",
       xlabel=r"\textbf{Sensors}")
   
-  no2_figs.append(fig)
-  no2_fignames.append('o3-coeff3-violin.svg')
+  o3_figs.append(fig)
+  o3_fignames.append('o3-coeff3-violin.svg')
 
   fig = plotting.plot_violin(coeffs_ox[:, :, 3].T,
       title=r"\textbf{Constant term for } $ OX $",
@@ -546,6 +550,9 @@ def pm_correlate(data):
     ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
     leg_labels=leg_labels)
 
+  text = get_corr_txt(pm1_vals[:, 0].astype(float),
+        pm1_vals[:, 1].astype(float))
+  ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
   fignames.append('pm1-comp.svg')
@@ -555,6 +562,9 @@ def pm_correlate(data):
     ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
     leg_labels=leg_labels)
 
+  text = get_corr_txt(pm10_vals[:, 0].astype(float),
+        pm10_vals[:, 1].astype(float))
+  ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
   fignames.append('pm10-comp.svg')
@@ -565,8 +575,6 @@ def pm_correlate(data):
     title = r'$ PM_{2.5} $ concentration',
     ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
     leg_labels=leg_labels)
-
-  text = r'\textbf{Correlation coefficients}'
 
   for i in range(1, np.size(pm25_vals, axis=1)):
     text = get_corr_txt(pm25_vals[:, i].astype(float),

@@ -323,6 +323,8 @@ def plot_hist(ax, v, bins=20, title=''):
     Plot the histogram of samples in v
   '''
 
+  if np.size(v) == v.shape[0]:
+    v = np.reshape(v, [np.size(v), 1])
   for (i, col) in enumerate(v.T):
     n, out_bins, patches = ax.hist(v[:,i], bins, density=True,
          facecolor=colorWheel[i], alpha=0.6)
