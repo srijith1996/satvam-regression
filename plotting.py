@@ -316,7 +316,7 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
   ax.legend(custom_lines, ['Mean', 'Median'],shadow='True',
             fontsize=13,ncol=1,loc='upper left')  
 
-  return fig
+  return fig, means, medians
 # ------------------------------------------------------------------------------
 def plot_hist(ax, v, bins=20, title=''):
   '''
@@ -325,6 +325,7 @@ def plot_hist(ax, v, bins=20, title=''):
 
   if np.size(v) == v.shape[0]:
     v = np.reshape(v, [np.size(v), 1])
+
   for (i, col) in enumerate(v.T):
     n, out_bins, patches = ax.hist(v[:,i], bins, density=True,
          facecolor=colorWheel[i], alpha=0.6)

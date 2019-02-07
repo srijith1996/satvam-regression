@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 # -------------------------------------------------------------------------------
 # Change this field to 'mpcb' or 'mru' based on deployment site
 DEPLOY_SITE = 'mru'
+DEPLOYMENT = 2
 
 DEPLOY_SITE = DEPLOY_SITE.lower()
 
@@ -46,7 +47,7 @@ PM1_FIELD_HDR = 'pm1conc'
 PM25_FIELD_HDR = 'pm25conc'
 PM10_FIELD_HDR = 'pm10conc'
 
-SENS_TS_FORMAT = '%Y-%m-%dT%H:%M:%S.000Z'  # Input timestamp format
+SENS_TS_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'  # Input timestamp format
 DES_FORMAT = '%Y/%m/%d %H:%M:%S'      # Output format
 
 #reference monitor data fields
@@ -54,7 +55,14 @@ if DEPLOY_SITE == 'mru':
 
   # input arg files
   REF_FILE = sys.argv[1]
-  EBAM_FILE = sys.argv[2]
+  EBAM_FILE = None
+  SENSOR_FILE_LIST = None
+
+  if DEPLOYMENT > 1:
+    EBAM_FILE = sys.argv[2]
+    SENSOR_FILE_LIST = sys.argv[3:-1]
+  else:
+    SENSOR_FILE_LIST = sys.argv[2:-1]
 
   R_SKIP_ROWS = [7]
   R_SKIP_ROWS_END = 11
@@ -66,14 +74,13 @@ if DEPLOY_SITE == 'mru':
 
   REF_TS_FORMAT = '%m/%d/%y %H:%M'
   REF_DATE_FORMAT = '%m/%d/%y'
-  EBAM_TS_FORMAT = '%d-%m-%Y %H:%M'
+  #EBAM_TS_FORMAT = '%d-%m-%Y %H:%M'
+  EBAM_TS_FORMAT = '%d/%m/%y %H:%M'
 
   # EBAM data fields
   EBAM_HEADER_ROW = 0
   EBAM_TS_FIELD_HDR = 'Time'
   EBAM_PM25_FIELD_HDR = 'ConcRT (mg/m3)'
-
-  SENSOR_FILE_LIST = sys.argv[3:-1]
 
 elif DEPLOY_SITE == 'mpcb':
 
@@ -107,7 +114,7 @@ NUM_SENSORS = len(SENSOR_FILE_LIST)
 # -------------------------------------------------------------------------------
 # ---------------- PRE-PROCESS SATVAM SENSOR DATA -------------------------------
 # -------------------------------------------------------------------------------
-print "Processing SATVAM data........"
+print "Processing SATVAM data (%d sensors)........" % NUM_SENSORS
 
 # list of dataframes for each mote
 sens_dfs = []
@@ -133,6 +140,10 @@ for (i, src_file) in enumerate(SENSOR_FILE_LIST):
 
   sens_dfs[i][TIME_FIELD_HDR] = pd.DataFrame(data=timestamps)
   #print sens_dfs[i]
+
+  if DEPLOYMENT == 1:
+    sens_dfs[i] = sens_dfs[i].drop([PM1_FIELD_HDR, PM25_FIELD_HDR,
+          PM10_FIELD_HDR, TEMP_FIELD_HDR, HUM_FIELD_HDR], axis=1)
 
   sens_dfs[i] = sens_dfs[i][sens_dfs[i].applymap(lambda x: 
             (x != "NoData" and x != "NO_DATA"
@@ -160,14 +171,16 @@ print "DONE"
 # -------------------------------------------------------------------------------
 print "Processing Reference monitor data........"
 
+ref_remove = ["NoData", "NO_DATA", "RS232", "CALIB_S", "CALIB_Z",
+              "FAULTY", "Samp<", "MAINT", "Zero", "Calib", "Span"]
+
 ref_df = pd.read_excel(REF_FILE, header=R_HEADER_ROW, skiprows=R_SKIP_ROWS)
 ref_df = ref_df.drop(np.arange(len(ref_df) - R_SKIP_ROWS_END, len(ref_df)))
 
+if DEPLOYMENT == 1 and DEPLOY_SITE == 'mru':
+  ref_df = ref_df.drop(["SO2", "CO"], axis=1)
 ref_df = ref_df[ref_df.applymap(lambda x:
-            (x != "NoData" and x != "NO_DATA"
-         and x != "RS232" and x != "CALIB_S"
-         and x != "CALIB_Z" and x != "FAULTY"
-         and x != "Samp<" and x != "MAINT")).all(1)].dropna()
+            (x not in ref_remove)).all(1)].dropna()
 
 # clean up time values that are 24:00
 for index, row in ref_df.iterrows():
@@ -218,7 +231,7 @@ print "DONE"
 # -------------------------------------------------------------------------------
 # ----------------- PRE-PROCESS EBAM DATA ---------------------------------------
 # -------------------------------------------------------------------------------
-if DEPLOY_SITE == 'mru':
+if DEPLOY_SITE == 'mru' and DEPLOYMENT != 1:
   print "Processing EBAM data........"
   
   ebam_df = pd.read_csv(EBAM_FILE, header=EBAM_HEADER_ROW)
@@ -259,14 +272,17 @@ no2_op1 = np.empty([len(time_vec), NUM_SENSORS])
 no2_op2 = np.empty([len(time_vec), NUM_SENSORS])
 ox_op1 = np.empty([len(time_vec), NUM_SENSORS])
 ox_op2 = np.empty([len(time_vec), NUM_SENSORS])
-temp = np.empty([len(time_vec), NUM_SENSORS])
-#hum = np.empty([len(time_vec), NUM_SENSORS])
-pm1 = np.empty([len(time_vec), NUM_SENSORS])
-pm25 = np.empty([len(time_vec), NUM_SENSORS])
-pm10 = np.empty([len(time_vec), NUM_SENSORS])
 
-no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:] = temp[:] = np.nan
-pm1[:] = pm25[:] = pm10[:] = np.nan
+no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:]
+
+if DEPLOYMENT != 1:
+  temp = np.empty([len(time_vec), NUM_SENSORS])
+  #hum = np.empty([len(time_vec), NUM_SENSORS])
+  pm1 = np.empty([len(time_vec), NUM_SENSORS])
+  pm25 = np.empty([len(time_vec), NUM_SENSORS])
+  pm10 = np.empty([len(time_vec), NUM_SENSORS])
+
+  pm1[:] = pm25[:] = pm10[:] = temp[:] = np.nan
 
 print "Time-stamp aligning SATVAM sensor values...."
 for i in xrange(NUM_SENSORS):
@@ -278,11 +294,13 @@ for i in xrange(NUM_SENSORS):
   sens_no2op2 = sens_dfs[i][NO2OP2_FIELD_HDR].values
   sens_oxop1 = sens_dfs[i][OXOP1_FIELD_HDR].values
   sens_oxop2 = sens_dfs[i][OXOP2_FIELD_HDR].values
-  sens_temp = sens_dfs[i][TEMP_FIELD_HDR].values
-  #sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
-  sens_pm1 = sens_dfs[i][PM1_FIELD_HDR].values
-  sens_pm25 = sens_dfs[i][PM25_FIELD_HDR].values
-  sens_pm10 = sens_dfs[i][PM10_FIELD_HDR].values
+
+  if DEPLOYMENT != 1:
+    sens_temp = sens_dfs[i][TEMP_FIELD_HDR].values
+    #sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
+    sens_pm1 = sens_dfs[i][PM1_FIELD_HDR].values
+    sens_pm25 = sens_dfs[i][PM25_FIELD_HDR].values
+    sens_pm10 = sens_dfs[i][PM10_FIELD_HDR].values
 
   # align to time_vec
   for j in xrange(len(sens_ts)):
@@ -292,11 +310,12 @@ for i in xrange(NUM_SENSORS):
     no2_op2[ts_index, i] = sens_no2op2[j]
     ox_op1[ts_index, i] = sens_oxop1[j]
     ox_op2[ts_index, i] = sens_oxop2[j]
-    temp[ts_index, i] = sens_temp[j]
 
-    pm1[ts_index, i] = sens_pm1[j]
-    pm25[ts_index, i] = sens_pm25[j]
-    pm10[ts_index, i] = sens_pm10[j]
+    if DEPLOYMENT != 1:
+      temp[ts_index, i] = sens_temp[j]
+      pm1[ts_index, i] = sens_pm1[j]
+      pm25[ts_index, i] = sens_pm25[j]
+      pm10[ts_index, i] = sens_pm10[j]
 
 #print no2_op1
 print "DONE"
@@ -307,10 +326,11 @@ ref_ts = ref_df[R_TIME_FIELD_HDR].values
 ref_no2 = np.empty([len(time_vec), ])
 ref_o3 = np.empty([len(time_vec), ])
 
+ref_no2[:] = ref_o3[:] = np.nan
+
 ref_pm10 = np.empty([len(time_vec), ])
 ref_pm25 = np.empty([len(time_vec), ])
 
-ref_no2[:] = ref_o3[:] = np.nan
 ref_pm25[:] = ref_pm10[:] = np.nan
 
 for j in xrange(len(ref_ts)):
@@ -323,17 +343,8 @@ for j in xrange(len(ref_ts)):
     ref_pm25[ts_index] = ref_df[R_PM25_FIELD_HDR].values[j]
 
 print "DONE"
-#print "Sizes:"
-#print np.shape(time_vec)
-#print np.shape(no2_op1)
-#print np.shape(no2_op2)
-#print np.shape(ox_op1)
-#print np.shape(ox_op2)
-#print np.shape(temp)
-#print np.shape(ref_no2)
-#print np.shape(ref_o3)
 # -------------------------------------------------------------------------------
-if DEPLOY_SITE == 'mru':
+if DEPLOY_SITE == 'mru' and DEPLOYMENT != 1:
   print "Time-stamp aligning EBAM data..."
   
   # ebam currently measures only pm2.5
@@ -354,7 +365,8 @@ aggregate_list.append(ref_no2)
 aggregate_list.append(ref_o3)
 
 for i in xrange(NUM_SENSORS):
-  aggregate_list.append(temp[:, i].tolist())
+  if DEPLOYMENT != 1:
+    aggregate_list.append(temp[:, i].tolist())
   aggregate_list.append(no2_op1[:, i].tolist())
   aggregate_list.append(no2_op2[:, i].tolist())
   aggregate_list.append(ox_op1[:, i].tolist())
@@ -365,7 +377,14 @@ target_df = target_df.dropna()
 print "Data set size (after dropna()): " + str(len(target_df.index))
 # -------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
-no2_figs, no2_fignames, o3_figs, o3_fignames = regress.regress_df(target_df, runs=5000)
+
+t_present = True
+if DEPLOYMENT == 1:
+  t_present = False
+
+no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
+        temps_present=t_present, incl_temps=True, incl_op2t=True, clean=3,
+        runs=1000)
 #pages = pdfpublish.generate_text()
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')
@@ -377,7 +396,7 @@ for (i, fig) in enumerate(no2_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + no2_fignames[i], format='svg')
+  fig.savefig(DIR_PREFIX + no2_names[i], format='svg')
   plt.close(fig)
 
 pdf.close()
@@ -392,7 +411,7 @@ for (i, fig) in enumerate(o3_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + o3_fignames[i], format='svg')
+  fig.savefig(DIR_PREFIX + o3_names[i], format='svg')
   plt.close(fig)
 
 pdf.close()
@@ -400,32 +419,32 @@ print 'O3 PDF ready'
 # -------------------------------------------------------------------------------
 # ---------------------- CORRELATE PM2.5 data -----------------------------------
 # -------------------------------------------------------------------------------
-aggregate_list = []
+if DEPLOYMENT > 1:
+  aggregate_list = []
 
-aggregate_list.append(time_vec)
-aggregate_list.append(ref_pm25)
+  aggregate_list.append(time_vec)
+  aggregate_list.append(ref_pm25)
 
-for i in xrange(NUM_SENSORS):
-  aggregate_list.append(pm1[:, i].tolist())
-  aggregate_list.append(pm25[:, i].tolist())
-  aggregate_list.append(pm10[:, i].tolist())
+  for i in xrange(NUM_SENSORS):
+    aggregate_list.append(pm1[:, i].tolist())
+    aggregate_list.append(pm25[:, i].tolist())
+    aggregate_list.append(pm10[:, i].tolist())
 
-target_df = pd.DataFrame(aggregate_list).transpose()
-target_df = target_df.dropna()
+  target_df = pd.DataFrame(aggregate_list).transpose()
+  target_df = target_df.dropna()
 
-print "Data set size for PM (after dropna()): " + str(len(target_df.index))
-# -------------------------------------------------------------------------------
-figs, names = regress.pm_correlate(target_df)
+  print "Data set size for PM (after dropna()): " + str(len(target_df.index))
+  figs, names = regress.pm_correlate(target_df)
 
-pdf = PdfPages(OUT_FILE_PREFIX + '-pm.pdf')
+  pdf = PdfPages(OUT_FILE_PREFIX + '-pm.pdf')
 
-# print figures
-for (i, fig) in enumerate(figs):
-  text = 'Figure %d' % (i + 1)
-  plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
-  fig.savefig(DIR_PREFIX + names[i], format='svg')
-  pdf.savefig(fig)
+  # print figures
+  for (i, fig) in enumerate(figs):
+    text = 'Figure %d' % (i + 1)
+    plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
+    fig.savefig(DIR_PREFIX + names[i], format='svg')
+    pdf.savefig(fig)
 
-pdf.close()
-print 'PM PDF ready'
+  pdf.close()
+  print 'PM PDF ready'
 # -------------------------------------------------------------------------------
