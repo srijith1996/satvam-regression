@@ -15,13 +15,28 @@ Run the following command on a BASH terminal:
 
 ```sh
 
-  python format-csv.py ref-monitor.xlsx ebam.csv sens1.csv sens2.csv sens3.csv outfile
+  python autoreg.py ref-monitor.xlsx ebam.csv sens1.csv sens2.csv sens3.csv output-prefix
     # replace ref-monitor.xlsx with Excel file directly downloaded
     # from the reference monitor and ebam.csv with the EBAM data file
     # replace sens*.csv with CSV files of the sensors
     # directly downloaded from Graphana
     # replace outfile with the output file prefix
 
+```
+
+To change the configuration switches to pertain to your desired deployment, do the following
+in the file autoreg.py 
+
+```python
+
+  DEPLOY_SITE=mpcb
+  DEPLOYMENT=2
+
+  # the DEPLOYMENT switch indicates if the deployment is 1st (Aug/Sept '18)
+  # or 2nd (Dec '18/current)
+
+  # the DEPLOY_SITE indicates if the site is MPCB or MRU
+  
 ```
 
 The output PDFs will be generated starting with the prefix specified in the
