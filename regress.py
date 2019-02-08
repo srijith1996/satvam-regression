@@ -162,6 +162,18 @@ def regress_df(data, temps_present=False,
   # store x and y values
   no2_y = data.values[:,1]
   o3_y = data.values[:,2]
+
+  if temps_present and incl_temps:
+    coeffs_no2_names.append('temp')
+    coeffs_ox_names.append('temp')
+
+  if temps_present and incl_op2t:
+    coeffs_no2_names.append('op2T')
+    coeffs_ox_names.append('op2T')
+
+  coeffs_no2_names.append('constant')
+  coeffs_ox_names.append('constant')
+    
   for i in xrange(np.size(data.values, 1)):
     if col_ox(i)[1] >= np.size(data.values, 1):
       break
@@ -175,9 +187,6 @@ def regress_df(data, temps_present=False,
         tmp_idx_n.append(col_temp(i))
         tmp_idx_o.append(col_temp(i))
 
-        coeffs_no2_names.append('temp')
-        coeffs_ox_names.append('temp')
-
     no2_x.append(data.values[:,tmp_idx_n])
     ox_x.append(data.values[:,tmp_idx_o])
 
@@ -189,12 +198,6 @@ def regress_df(data, temps_present=False,
 
       no2_x[i] = np.concatenate((no2_x[i], no2_op2t), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op2t), axis=1)
-
-      coeffs_no2_names.append('op2T')
-      coeffs_ox_names.append('op2T')
-
-  coeffs_no2_names.append('constant')
-  coeffs_ox_names.append('constant')
 
   # convert o3 to ox for regression
   ox_y = o3_y + no2_y
