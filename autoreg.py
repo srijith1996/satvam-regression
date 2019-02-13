@@ -396,7 +396,7 @@ for (i, fig) in enumerate(no2_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + no2_names[i], format='svg')
+  #fig.savefig(DIR_PREFIX + no2_names[i], format='svg')
   plt.close(fig)
 
 pdf.close()
@@ -411,7 +411,7 @@ for (i, fig) in enumerate(o3_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + o3_names[i], format='svg')
+  #fig.savefig(DIR_PREFIX + o3_names[i], format='svg')
   plt.close(fig)
 
 pdf.close()
@@ -449,7 +449,7 @@ if DEPLOYMENT > 1:
   for (i, fig) in enumerate(figs):
     text = 'Figure %d' % (i + 1)
     plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
-    fig.savefig(DIR_PREFIX + names[i], format='svg')
+    #fig.savefig(DIR_PREFIX + names[i], format='svg')
     pdf.savefig(fig)
 
   pdf.close()
