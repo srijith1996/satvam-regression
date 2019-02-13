@@ -385,8 +385,8 @@ def regress_df(data, temps_present=False,
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
             leg_labels=["Residual error"])
 
-      fig_o, ax = plotting.ts_plot(epochs, resid_o3,
-            title=r"\textbf{Prediction errors (} $ O_3 $ \textbf{) vs temperature (Sensor "
+      fig_o, ax = plotting.ts_plot(epochs, resid_ox,
+            title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
             leg_labels=["Residual error"])
@@ -414,15 +414,15 @@ def regress_df(data, temps_present=False,
                   xycoords="axes fraction")
     
       # for O3
-      fig_o, ax = plotting.compare_ts_plot(epochs, resid_o3[:, 0], temp[j],
-            title=r"\textbf{Prediction errors (} $ O_3 $ \textbf{) vs temperature (Sensor "
+      fig_o, ax = plotting.compare_ts_plot(epochs, resid_ox, temp[j],
+            title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}",
             ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
             ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
 
-      p = np.polyfit(temp[j].astype(float), resid_o3[:, 0].astype(float), 1)
-      r2 = stats.coeff_deter(temp[j].astype(float), resid_o3[:, 0].astype(float))
+      p = np.polyfit(temp[j].astype(float), resid_ox.astype(float), 1)
+      r2 = stats.coeff_deter(temp[j].astype(float), resid_ox.astype(float))
   
       plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
       plot_str2 = "$ {R^2}_{eT} = %.4f $" % r2
@@ -451,6 +451,16 @@ def regress_df(data, temps_present=False,
 
     no2_figs.append(fig)
     no2_fignames.append("no2-sens%d-autocorr.svg" % (j+1))
+
+    print "plotting autocorrelation of residuals"
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plotting.set_plot_labels(ax, title="Autocorrelation of $ O_3 $ residuals",
+        xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
+    fig = plot_acf(pd.Series(resid_ox).values, ax=ax, lags=np.arange(0, 2000, 10))
+
+    o3_figs.append(fig)
+    o3_fignames.append("o3-sens%d-autocorr.svg" % (j+1))
 
     #print "plotting PACF"
     #fig = plt.figure()
@@ -567,7 +577,7 @@ def regress_df(data, temps_present=False,
     o3_figs.append(fig)
     o3_fignames.append('o3-coeff%d-violin.svg' % (i + 1))
 
-  mean_ox_coeffs = np.array(mean_ox_coeffs).T
+  mean_ox_coeffs = np.array(mean_ox_coeffs)
   # -------------------------------------------------------------------------
 
 
@@ -597,6 +607,33 @@ def regress_df(data, temps_present=False,
 
     no2_figs.append(fig)
     no2_fignames.append('no2-coeffs-predict-sens%d' % (j + 1))
+
+  for (j, ox) in enumerate(ox_x):
+    
+    leg_labels = [('Coefficient set %d' % i) for i in range(1,
+          np.shape(mean_ox_coeffs)[1] + 1)]
+    leg_labels.insert(0, 'Reference conc')
+
+    ox = np.concatenate((ox, np.ones([np.shape(ox)[0], 1])), axis=1)
+    t_series = np.concatenate((np.reshape(ox_y, [np.size(ox_y), 1]),
+        np.dot(ox, mean_ox_coeffs)), axis=1)
+
+    fig, ax = plotting.ts_plot(epochs, t_series,
+        title = r'\textbf{Comparison of predicted values for }'
+              + r'$ OX $ \textbf{ (Sensor %d)}' % (j + 1),
+        ylabel = r'Concentration (ppb)',
+        leg_labels=leg_labels)
+
+    for i in range(1, np.size(t_series, axis=1)):
+      text = get_corr_txt(t_series[:, i].astype(float),
+        t_series[:, 0].astype(float), add_title='Set %d' % i)
+
+      x = i / 5.0
+      ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+
+    o3_figs.append(fig)
+    o3_fignames.append('ox-coeffs-predict-sens%d' % (j + 1))
+
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 
