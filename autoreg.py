@@ -425,6 +425,9 @@ if DEPLOYMENT > 1:
   aggregate_list.append(time_vec)
   aggregate_list.append(ref_pm25)
 
+  if DEPLOY_SITE == 'mpcb':
+    aggregate_list.append(ref_pm10)
+
   for i in xrange(NUM_SENSORS):
     aggregate_list.append(pm1[:, i].tolist())
     aggregate_list.append(pm25[:, i].tolist())
@@ -434,7 +437,11 @@ if DEPLOYMENT > 1:
   target_df = target_df.dropna()
 
   print "Data set size for PM (after dropna()): " + str(len(target_df.index))
-  figs, names = regress.pm_correlate(target_df)
+  incl_pm10 = False
+  if DEPLOY_SITE == 'mpcb':
+    incl_pm10 = True
+
+  figs, names = regress.pm_correlate(target_df, ref_pm10_incl=incl_pm10)
 
   pdf = PdfPages(OUT_FILE_PREFIX + '-pm.pdf')
 

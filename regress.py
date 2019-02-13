@@ -39,7 +39,7 @@ def get_corr_txt(y_true, y_pred, add_title=''):
 
   return text
 # ------------------------------------------------------------------------------
-def regress_once(X, y, train_size=0.7):
+def regress_once(X, y, train_size=0.7, intercept=True):
   
   train_size = int(np.floor(train_size * X.shape[0]))
 
@@ -60,7 +60,7 @@ def regress_once(X, y, train_size=0.7):
   #no2_x_train[1] -= ae_zero_offsets[j]
     
   # train model
-  reg = LinearRegression().fit(X_train, y_train)
+  reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
     
   # TODO: Publish to report
   #print "Regression coefficients: \t", reg_no2.coef_
@@ -288,7 +288,7 @@ def regress_df(data, temps_present=False,
   #ae_zero_offsets = [228, 230, 221]
 
   resid_no2 = np.zeros([len(no2_y), 1])
-  resid_o3 = np.zeros([len(ox_y), 1])
+  resid_ox = np.zeros([len(ox_y), 1])
   coeffs_no2 = []
   coeffs_ox = []
 
@@ -601,7 +601,7 @@ def regress_df(data, temps_present=False,
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 
 # ----------------------------------------------------------------------------------
-def pm_correlate(data):
+def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
   
   # list of all figures plotted
   figs = []
@@ -617,28 +617,54 @@ def pm_correlate(data):
 
   leg_labels = []
 
-  pm25_vals.append(data.values[:, 1])
-  for i in range(2, np.size(data.values, 1), 3):
+  start_i = 2
+  if ref_pm1_incl:
+    start_i=3
+    pm1_vals.append(data.values[:, 1])
+    pm25_vals.append(data.values[:, 2])
+    if ref_pm10_incl:
+      start_i=4
+      pm10_vals.append(data.values[:, 3])
+
+  else:
+    pm25_vals.append(data.values[:, 1])
+    if ref_pm10_incl:
+      start_i=3
+      pm10_vals.append(data.values[:, 2])
+
+  for i in range(start_i, np.size(data.values, 1), 3):
     pm1_vals.append(data.values[:, i].tolist())
     pm25_vals.append(data.values[:, i+1].tolist())
     pm10_vals.append(data.values[:, i+2].tolist())
 
     leg_labels.append('Sensor %d' % int(((i-2)/3) + 1))
 
+  leg_labels_pm1 = leg_labels[:]
+  leg_labels_pm10 = leg_labels[:]
+  leg_labels.insert(0, 'Reference')
 
   # TODO: Minute average PM1 and PM10 data
   pm1_vals = np.array(pm1_vals).T
   pm25_vals = np.array(pm25_vals).T
   pm10_vals = np.array(pm10_vals).T
 
+  if np.shape(pm1_vals)[1] < 2:
+    leg_labels_pm1.insert(0, 'Reference')
+
+  if np.shape(pm10_vals)[1] < 2:
+    leg_labels_pm10.insert(0, 'Reference')
+
   fig, ax = plotting.ts_plot(ts, pm1_vals,
     title = r'$ PM_{1.0} $ concentration',
     ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
-    leg_labels=leg_labels)
+    leg_labels=leg_labels_pm1)
 
-  text = get_corr_txt(pm1_vals[:, 0].astype(float),
-        pm1_vals[:, 1].astype(float))
-  ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
+  for i in range(1, np.size(pm25_vals, axis=1)):
+    text = get_corr_txt(pm25_vals[:, i].astype(float),
+        pm25_vals[:, 0].astype(float), add_title='S%d' % i)
+
+    x = i / 5.0
+    ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
   fignames.append('pm1-comp.svg')
@@ -646,16 +672,17 @@ def pm_correlate(data):
   fig, ax = plotting.ts_plot(ts, pm10_vals,
     title = r'$ PM_{10} $ concentration',
     ylabel = r'\textit{Concentration ($ ug/m^3 $)}',
-    leg_labels=leg_labels)
+    leg_labels=leg_labels_pm10)
 
-  text = get_corr_txt(pm10_vals[:, 0].astype(float),
-        pm10_vals[:, 1].astype(float))
-  ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
+  for i in range(1, np.size(pm25_vals, axis=1)):
+    text = get_corr_txt(pm25_vals[:, i].astype(float),
+        pm25_vals[:, 0].astype(float), add_title='S%d' % i)
+
+    x = i / 5.0
+    ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
   fignames.append('pm10-comp.svg')
-
-  leg_labels.insert(0, 'EBAM')
 
   fig, ax = plotting.ts_plot(ts, pm25_vals,
     title = r'$ PM_{2.5} $ concentration',
