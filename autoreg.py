@@ -248,8 +248,9 @@ if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   
   print "Interpreting time stamps...."
   times = ebam_df[EBAM_TS_FIELD_HDR].values
-  
+
   for i in xrange(len(times)):
+    print times[i]
     times[i] = dt.datetime.strptime(times[i],
         EBAM_TS_FORMAT).strftime('%s')
     times[i] = int(times[i])

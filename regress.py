@@ -376,6 +376,13 @@ def regress_df(data, temps_present=False, hum_present=False,
 
       coeffs = regress_once(no2_x[j], no2_y, training_set_ratio)
       coeffs_no2[j].append(coeffs)
+
+      #no2_y_tmp = no2_y - coeffs[-1]
+
+      #coeffs_new, pred_no2_new, resid_no2_new = regress_once(no2_x[j],
+      #    no2_y_tmp, training_set_ratio, intercept=False)
+
+      #print "Residue after subtracting const \t\t%.3f" % stats.mae(pred_no2_new, no2_y_tmp)
     
       coeffs = regress_once(ox_x[j], ox_y, training_set_ratio)
       coeffs_ox[j].append(coeffs)
@@ -589,6 +596,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     o3_figs.append(fig)
     o3_fignames.append('o3-predicted-comp')
 
+
   # compare violins of each NO2 sensor
   coeffs_no2 = np.array(coeffs_no2)
   coeffs_ox = np.array(coeffs_ox)
@@ -744,10 +752,10 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False, loc_label='---')
   # list of all figures plotted
   figs = []
   fignames = []
-  
+
   # remove sub-zero ppb values
   data = data[data.applymap(lambda x: x > 0).all(1)]
-  
+
   ts = data.values[:,0]
   pm1_vals = []
   pm25_vals = []
