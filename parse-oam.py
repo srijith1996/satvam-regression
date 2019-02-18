@@ -68,19 +68,22 @@ with open(infile, 'r') as fh:
     epoch = int(start_epoch + diff_epoch)
 
     just_entered = True
+    first_line = True
     while True: 
       # check if end of link is reached
-      if (not just_entered) and fh.readline() != '|':
+      if (not just_entered) and fh.readline()[0] != '|':
         just_entered = True
         break
       else:
         just_entered = False
 
-      line = fh.readline()
-      node_name = parse_node_data(line, epoch)
+      if first_line:
+        line = fh.readline()
+        node_name = parse_node_data(line, epoch)
+        first_line = False
 
-      # skip pipe
-      fh.readline()
+        # skip pipe
+        fh.readline()
 
       link_line = fh.readline()
       
@@ -91,6 +94,8 @@ with open(infile, 'r') as fh:
       pt_node_name = parse_node_data(line, epoch)
 
       parse_link_data(link_line, node_name, pt_node_name, epoch)
+
+      node_name = pt_node_name
 
  
 print "Following nodes and links have existed in the past run"
