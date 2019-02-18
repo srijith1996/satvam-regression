@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.patches as mpatches
 from mpl_toolkits.axes_grid.inset_locator import inset_axes
-from matplotlib.ticker import ScalarFormatter,AutoMinorLocator
+from matplotlib.ticker import ScalarFormatter,AutoMinorLocator, MultipleLocator
 import matplotlib as mpl
 from matplotlib import rc
 import time
@@ -61,9 +61,6 @@ def set_plot_labels(ax, title='', xlabel='', ylabel=''):
   ax.set_xlabel(xlabel)
   ax.set_ylabel(ylabel)
 
-  ax.grid(b=True, which='both', axis='both',
-          color='gray', linestyle='-', alpha=0.2)
-  
 # ------------------------------------------------------------------------------
 def plot_reg_plane(X, Y, coeffs, points=40,
                    title='', xlabel='', ylabel='',
@@ -146,7 +143,19 @@ def format_date(x, pos=None):
 def format_x_date(fig, ax):
   fig.autofmt_xdate()
 
+  majorLocator = MultipleLocator(604800)  # week boundary
+  minorLocator = MultipleLocator(86400)   # day boundary
+
+  ax.xaxis.set_major_locator(majorLocator)
   ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
+  ax.xaxis.set_minor_locator(minorLocator)
+ 
+  ax.grid(b=True, which='major', axis='both',
+          color='gray', linestyle='--', alpha=0.35)
+  
+  ax.grid(b=True, which='minor', axis='x',
+          color='gray', linestyle=':', alpha=0.25)
+  
   ax.set_xlabel(r'\textbf{Time}')
   plt.xticks(rotation=30)
 # ------------------------------------------------------------------------------
