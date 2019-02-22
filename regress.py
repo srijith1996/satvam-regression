@@ -16,6 +16,9 @@ import sys
 import plotting
 import stats
 # ------------------------------------------------------------------------------
+CONF_DECIMALS = 6
+
+# ------------------------------------------------------------------------------
 def get_corr_txt(y_true, y_pred, add_title=''):
 
   if np.size(y_true) == np.shape(y_true)[0]:
@@ -31,11 +34,11 @@ def get_corr_txt(y_true, y_pred, add_title=''):
   r2 = stats.coeff_deter(y_true, y_pred)
 
   text = r'\textbf{Correlation Stats %s}'% add_title
-  text = text + '\n' + r'$ RMSE = %0.3f $' % rmse
-  text = text + '\n' + r'$ MAPE = %0.3f $' % mape
-  text = text + '\n' + r'$ MAE  = %0.3f $' % mae
-  text = text + '\n' + r'$ r_P  = %0.3f $' % pearson
-  text = text + '\n' + r'$ R^2  = %0.3f $' % r2
+  text = text + '\n' + r'$ R^2  = %g $' % stats.round_sig(coeff_det, 4)
+  text = text + '\n' + r'$ MAE  = %g $' % stats.round_sig(mae, 4)
+  text = text + '\n' + r'$ RMSE = %g $' % stats.round_sig(rmse, 4)
+  text = text + '\n' + r'$ MAPE = %g\%% $' % stats.round_sig(mape, 4)
+  text = text + '\n' + r'$ r_P  = %g $' % stats.round_sig(pearson, 4)
 
   return text
 # ------------------------------------------------------------------------------
@@ -370,8 +373,8 @@ def regress_df(data, temps_present=False, hum_present=False,
   # ---------------------------- VISUALIZATION ------------------------------
     # plot predicted vs. true ppb
     print "plotting actual and predicted values: NO2"
-    t_series = np.array([no2_y, predict_no2]).T
-
+    t_series = np.round(np.array([no2_y, predict_no2]).T,
+                        decimals=CONF_DECIMALS)
     fig, ax = plotting.ts_plot(epochs, t_series,
         title = r'\textbf{True and Predicted concentrations of }'
               + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
@@ -386,7 +389,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     no2_fignames.append('no2-sens%d-predict-true-comp.svg' % (j+1))
 
     print "plotting actual and predicted values: O3"
-    t_series = np.array([o3_y, predict_o3]).T
+    t_series = np.round(np.array([o3_y, predict_o3]).T,
+                        decimals=CONF_DECIMALS)
 
     fig, ax = plotting.ts_plot(epochs, t_series,
         title = r'\textbf{True and Predicted concentrations of } $ O_3 $',
@@ -450,10 +454,12 @@ def regress_df(data, temps_present=False, hum_present=False,
 
       # compute r^2 between residual and temperature
       p = np.polyfit(temp[j].astype(float), resid_no2.astype(float), 1)
-      r2 = stats.coeff_deter(temp[j].astype(float), resid_no2.astype(float))
+      r = stats.pearson(temp[j].astype(float), resid_no2.astype(float))
   
-      plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
-      plot_str2 = "$ {R^2}_{eT} = %.4f $" % r2
+      plot_str = "$ e = %g * T + %g $" % (stats.round_sig(p[0], 4),
+            stats.round_sig(p[1], 4))
+      plot_str2 = "$ {r}_{e,T} = %.4f $" % stats.round_sig(r, 4)
+
       ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
               plot_str, ha="center", va="bottom")
       ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
@@ -472,11 +478,11 @@ def regress_df(data, temps_present=False, hum_present=False,
             ids=[(j+1), -1])
 
 
-      p = np.polyfit(temp[j].astype(float), resid_ox.astype(float), 1)
-      r2 = stats.coeff_deter(temp[j].astype(float), resid_ox.astype(float))
+      p = np.polyfit(temp[j].astype(float), resid_o3.astype(float), 1)
+      r = stats.pearson(temp[j].astype(float), resid_o3.astype(float))
   
       plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
-      plot_str2 = "$ {R^2}_{eT} = %.4f $" % r2
+      plot_str2 = "$ {r}_{e,T} = %.4f $" % r
       ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
               plot_str, ha="center", va="bottom")
       ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
