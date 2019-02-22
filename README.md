@@ -29,7 +29,7 @@ in the file autoreg.py
 
 ```python
 
-  DEPLOY_SITE=mpcb
+  DEPLOY_SITE='mpcb'
   DEPLOYMENT=2
 
   # the DEPLOYMENT switch indicates if the deployment is 1st (Aug/Sept '18)

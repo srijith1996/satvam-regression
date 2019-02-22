@@ -10,7 +10,7 @@
     python autoreg.py <ref_data_file> [<ebam_file>]
             <space_separated_list_of_sensor_files> <output-files-prefix>
 
-    use [<ebam_file>] only when DEPLOY_SITE is set to 'mru'
+    use [<ebam_file>] only when DEPLOY_SITE is set to 'MRIU'
 
 '''
 # -------------------------------------------------------------------------------
@@ -25,11 +25,11 @@ import regress
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 # -------------------------------------------------------------------------------
-# Change this field to 'mpcb' or 'mru' based on deployment site
-DEPLOY_SITE = 'mru'
+# Change this field to 'MPCB' or 'MRIU' based on deployment site
+DEPLOY_SITE = 'MRIU'
 DEPLOYMENT = 2
 
-DEPLOY_SITE = DEPLOY_SITE.lower()
+DEPLOY_SITE = DEPLOY_SITE.upper()
 
 # configurables
 STEP_SIZE_TS = 60                     # desired granularity of data input
@@ -51,7 +51,7 @@ SENS_TS_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'  # Input timestamp format
 DES_FORMAT = '%Y/%m/%d %H:%M:%S'      # Output format
 
 #reference monitor data fields
-if DEPLOY_SITE == 'mru':
+if DEPLOY_SITE == 'MRIU':
 
   # input arg files
   REF_FILE = sys.argv[1]
@@ -82,7 +82,7 @@ if DEPLOY_SITE == 'mru':
   EBAM_TS_FIELD_HDR = 'Time'
   EBAM_PM25_FIELD_HDR = 'ConcRT (mg/m3)'
 
-elif DEPLOY_SITE == 'mpcb':
+elif DEPLOY_SITE == 'MPCB':
 
   # input arg files
   REF_FILE = sys.argv[1]
@@ -177,7 +177,7 @@ ref_remove = ["NoData", "NO_DATA", "RS232", "CALIB_S", "CALIB_Z",
 ref_df = pd.read_excel(REF_FILE, header=R_HEADER_ROW, skiprows=R_SKIP_ROWS)
 ref_df = ref_df.drop(np.arange(len(ref_df) - R_SKIP_ROWS_END, len(ref_df)))
 
-if DEPLOYMENT == 1 and DEPLOY_SITE == 'mru':
+if DEPLOYMENT == 1 and DEPLOY_SITE == 'MRIU':
   ref_df = ref_df.drop(["SO2", "CO"], axis=1)
 ref_df = ref_df[ref_df.applymap(lambda x:
             (x not in ref_remove)).all(1)].dropna()
@@ -185,14 +185,14 @@ ref_df = ref_df[ref_df.applymap(lambda x:
 # clean up time values that are 24:00
 for index, row in ref_df.iterrows():
   if row[R_TIME_FIELD_HDR] == '24:00' or row[R_TIME_FIELD_HDR][-5:] == '24:00':
-    if DEPLOY_SITE == 'mru':
+    if DEPLOY_SITE == 'MRIU':
       row[R_TIME_FIELD_HDR] = '00:00'
       row[R_DATE_FIELD_HDR] = dt.datetime.strptime(
           row[R_DATE_FIELD_HDR], REF_DATE_FORMAT) + timedelta(days=1)
       row[R_DATE_FIELD_HDR] = dt.datetime.strftime(row[R_DATE_FIELD_HDR],
           REF_DATE_FORMAT)
 
-    elif DEPLOY_SITE == 'mpcb':
+    elif DEPLOY_SITE == 'MPCB':
       row[R_TIME_FIELD_HDR] = row[R_TIME_FIELD_HDR][:-5] + '00:00'
       row[R_TIME_FIELD_HDR] = dt.datetime.strptime(
           row[R_TIME_FIELD_HDR], REF_TS_FORMAT) + timedelta(days=1)
@@ -202,12 +202,12 @@ for index, row in ref_df.iterrows():
 print "Interpreting time stamps...."
 times = ref_df[R_TIME_FIELD_HDR].values
 
-if DEPLOY_SITE == 'mru':
+if DEPLOY_SITE == 'MRIU':
   dates = ref_df[R_DATE_FIELD_HDR].values
 
 for i in xrange(len(times)):
 
-  if DEPLOY_SITE == 'mru':
+  if DEPLOY_SITE == 'MRIU':
     times[i] = dates[i] + ' ' + times[i]
 
   times[i] = dt.datetime.strptime(times[i], REF_TS_FORMAT).strftime('%s')
@@ -218,7 +218,7 @@ for i in xrange(len(times)):
 
 print "Reference monitor has %d points" % len(ref_df.index)
 
-if DEPLOY_SITE == 'mru':
+if DEPLOY_SITE == 'MRIU':
   ref_df = ref_df.drop(columns=[R_DATE_FIELD_HDR])
 
 min_time = min([times[0], min_time])
@@ -231,7 +231,7 @@ print "DONE"
 # -------------------------------------------------------------------------------
 # ----------------- PRE-PROCESS EBAM DATA ---------------------------------------
 # -------------------------------------------------------------------------------
-if DEPLOY_SITE == 'mru' and DEPLOYMENT != 1:
+if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   print "Processing EBAM data........"
   
   ebam_df = pd.read_csv(EBAM_FILE, header=EBAM_HEADER_ROW)
@@ -338,13 +338,13 @@ for j in xrange(len(ref_ts)):
   ref_no2[ts_index] = ref_df[R_NO2_FIELD_HDR].values[j]
   ref_o3[ts_index] = ref_df[R_OX_FIELD_HDR].values[j]
 
-  if DEPLOY_SITE == 'mpcb':
+  if DEPLOY_SITE == 'MPCB':
     ref_pm10[ts_index] = ref_df[R_PM10_FIELD_HDR].values[j]
     ref_pm25[ts_index] = ref_df[R_PM25_FIELD_HDR].values[j]
 
 print "DONE"
 # -------------------------------------------------------------------------------
-if DEPLOY_SITE == 'mru' and DEPLOYMENT != 1:
+if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   print "Time-stamp aligning EBAM data..."
   
   # ebam currently measures only pm2.5
@@ -425,7 +425,7 @@ if DEPLOYMENT > 1:
   aggregate_list.append(time_vec)
   aggregate_list.append(ref_pm25)
 
-  if DEPLOY_SITE == 'mpcb':
+  if DEPLOY_SITE == 'MPCB':
     aggregate_list.append(ref_pm10)
 
   for i in xrange(NUM_SENSORS):
@@ -438,7 +438,7 @@ if DEPLOYMENT > 1:
 
   print "Data set size for PM (after dropna()): " + str(len(target_df.index))
   incl_pm10 = False
-  if DEPLOY_SITE == 'mpcb':
+  if DEPLOY_SITE == 'MPCB':
     incl_pm10 = True
 
   figs, names = regress.pm_correlate(target_df, ref_pm10_incl=incl_pm10)
