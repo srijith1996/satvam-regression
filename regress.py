@@ -250,7 +250,7 @@ def regress_df(data, temps_present=False, hum_present=False,
   fig = plotting.inset_hist_fig(fig, ax, no2_y, ['25%', '25%'], 1, ids=[0])
 
   no2_figs.append(fig)
-  no2_fignames.append('no2-ref.svg')
+  no2_fignames.append('no2-ref')
 
   fig, ax = plotting.ts_plot(epochs, o3_y,
          title=r'$ O_3 $ \textbf{readings from Reference monitor}',
@@ -260,7 +260,7 @@ def regress_df(data, temps_present=False, hum_present=False,
   fig = plotting.inset_hist_fig(fig, ax, o3_y, ['25%', '25%'], 1, ids=[0])
 
   o3_figs.append(fig)
-  o3_fignames.append('o3-ref.svg')
+  o3_fignames.append('o3-ref')
 
   # visualize time-series of AlphaSense sensors
   # TODO: Change labels based on sensor name 
@@ -284,7 +284,7 @@ def regress_df(data, temps_present=False, hum_present=False,
                                 ['25%', '25%'], 1, ids=ids)
 
   no2_figs.append(fig)
-  no2_fignames.append('no2-op1.svg')
+  no2_fignames.append('no2-op1')
 
   fig, ax = plotting.ts_plot(epochs, no2_op2_vals,
          title=r'$ NO_2 $ \textbf{Output2 from AlphaSense sensors}',
@@ -296,7 +296,7 @@ def regress_df(data, temps_present=False, hum_present=False,
                                  ['25%', '25%'], 1, ids=ids)
 
   no2_figs.append(fig)
-  no2_fignames.append('no2-op2.svg')
+  no2_fignames.append('no2-op2')
 
   for (i, sens_ox) in enumerate(ox_x):
     ox_op1_vals[:, i] = sens_ox[:, 0]
@@ -312,7 +312,7 @@ def regress_df(data, temps_present=False, hum_present=False,
                                 ['25%', '25%'], 1, ids=ids)
 
   o3_figs.append(fig)
-  o3_fignames.append('o3-op1.svg')
+  o3_fignames.append('o3-op1')
 
   fig, ax = plotting.ts_plot(epochs, ox_op2_vals,
          title=r'$ OX (NO_2 + O_3) $ \textbf{Output 2 from AlphaSense sensors}',
@@ -324,7 +324,7 @@ def regress_df(data, temps_present=False, hum_present=False,
                                 ['25%', '25%'], 1, ids=ids)
 
   o3_figs.append(fig)
-  o3_fignames.append('o3-op2.svg')
+  o3_fignames.append('o3-op2')
   # -------------------------------------------------------------------------
 
   # ---------------------------MULTIFOLD REGRESSION--------------------------
@@ -391,7 +391,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     no2_figs.append(fig)
-    no2_fignames.append('no2-sens%d-predict-true-comp.svg' % (j+1))
+    no2_fignames.append('no2-sens%d-predict-true-comp' % (j+1))
 
     print "plotting actual and predicted values: O3"
     t_series = np.round(np.array([o3_y, predict_o3]).T,
@@ -407,7 +407,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
 
     o3_figs.append(fig)
-    o3_fignames.append('o3-sens%d-predict-true-comp.svg' % (j+1))
+    o3_fignames.append('o3-sens%d-predict-true-comp' % (j+1))
 
     # plot residuals wrt time
     print "plotting residual characteristics"
@@ -479,10 +479,10 @@ def regress_df(data, temps_present=False, hum_present=False,
     
 
     no2_figs.append(fig_n)
-    no2_fignames.append('no2-sens%d-res-temp-comp.svg' % (j+1))
+    no2_fignames.append('no2-sens%d-res-temp-comp' % (j+1))
     
     o3_figs.append(fig_o)
-    o3_fignames.append('o3-sens%d-res-temp-comp.svg' % (j+1))
+    o3_fignames.append('o3-sens%d-res-temp-comp' % (j+1))
     
     # plot autocorrelation of residuals
     print "plotting autocorrelation of residuals"
@@ -493,7 +493,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     fig = plot_acf(pd.Series(resid_no2).values, ax=ax, lags=np.arange(0, 2000, 10))
 
     no2_figs.append(fig)
-    no2_fignames.append("no2-sens%d-autocorr.svg" % (j+1))
+    no2_fignames.append("no2-sens%d-autocorr" % (j+1))
 
     print "plotting autocorrelation of residuals"
     fig = plt.figure()
@@ -503,7 +503,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     fig = plot_acf(pd.Series(resid_ox).values, ax=ax, lags=np.arange(0, 2000, 10))
 
     o3_figs.append(fig)
-    o3_fignames.append("o3-sens%d-autocorr.svg" % (j+1))
+    o3_fignames.append("o3-sens%d-autocorr" % (j+1))
 
     print "Sensor %d DONE" % (j+1)
 
@@ -524,7 +524,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
 
     no2_figs.append(fig)
-    no2_fignames.append('no2-predicted-comp.svg')
+    no2_fignames.append('no2-predicted-comp')
 
     # TODO: Make legend labels more generic
     fig, ax = plotting.ts_plot(epochs, o3_y_pred,
@@ -537,7 +537,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
 
     o3_figs.append(fig)
-    o3_fignames.append('o3-predicted-comp.svg')
+    o3_fignames.append('o3-predicted-comp')
 
   # compare violins of each NO2 sensor
   coeffs_no2 = np.array(coeffs_no2)
@@ -557,9 +557,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     #print medians
 
     no2_figs.append(fig)
-    no2_fignames.append('no2-coeff%d-violin.svg' % (i + 1))
-
-  mean_no2_coeffs = np.array(mean_no2_coeffs)
+    no2_fignames.append('no2-coeff%d-violin' % (i + 1))
 
   for i in xrange(coeffs_ox.shape[2]):
     fig, means, medians = plotting.plot_violin(coeffs_ox[:, :, i].T,
@@ -572,9 +570,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     #print medians
 
     o3_figs.append(fig)
-    o3_fignames.append('o3-coeff%d-violin.svg' % (i + 1))
-
-  mean_ox_coeffs = np.array(mean_ox_coeffs)
+    o3_fignames.append('o3-coeff%d-violin' % (i + 1))
   # -------------------------------------------------------------------------
 
 
@@ -703,7 +699,7 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
-  fignames.append('pm1-comp.svg')
+  fignames.append('pm1-comp')
 
   fig, ax = plotting.ts_plot(ts, pm10_vals,
     title = r'$ PM_{10} $ concentration',
@@ -718,7 +714,7 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
-  fignames.append('pm10-comp.svg')
+  fignames.append('pm10-comp')
 
   fig, ax = plotting.ts_plot(ts, pm25_vals,
     title = r'$ PM_{2.5} $ concentration',
@@ -733,7 +729,7 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
   figs.append(fig)
-  fignames.append('pm25-comp.svg')
+  fignames.append('pm25-comp')
 
   return figs, fignames
 # ----------------------------------------------------------------------------------
