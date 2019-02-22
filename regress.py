@@ -243,20 +243,20 @@ def regress_df(data, temps_present=False, hum_present=False,
   # visualize time-series of ref data
   fig, ax = plotting.ts_plot(epochs, no2_y,
          title=r'$ NO_2 $\textbf{ readings from Reference monitor}',
-         ylabel=r'$ NO_2 $\textit{ concentration (ppb)}',
-         leg_labels=[r'$ NO_2 $ conc (ppb)'])
+         ylabel=r'$ NO_2 $\textit{ concentration (ppb)}', ylim=[0, 100],
+         leg_labels=[r'$ NO_2 $ conc (ppb)'], ids=[0])
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_y, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, no2_y, ['25%', '25%'], 1, ids=[0])
 
   no2_figs.append(fig)
   no2_fignames.append('no2-ref.svg')
 
   fig, ax = plotting.ts_plot(epochs, o3_y,
          title=r'$ O_3 $ \textbf{readings from Reference monitor}',
-         ylabel=r'$ O_3 $\textit{concentration (ppb)}',
-         leg_labels=['$ O_3 $ conc (ppb)'])
+         ylabel=r'$ O_3 $\textit{concentration (ppb)}', ylim=[0, 100],
+         leg_labels=['$ O_3 $ conc (ppb)'], ids=[0])
 
-  fig = plotting.inset_hist_fig(fig, ax, o3_y, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, o3_y, ['25%', '25%'], 1, ids=[0])
 
   o3_figs.append(fig)
   o3_fignames.append('o3-ref.svg')
@@ -272,22 +272,27 @@ def regress_df(data, temps_present=False, hum_present=False,
     no2_op1_vals[:, i] = sens_no2[:, 0]
     no2_op2_vals[:, i] = sens_no2[:, 1]
 
+  ids=range(1, len(no2_x)+1)
   fig, ax = plotting.ts_plot(epochs, no2_op1_vals,
          title=r'$ NO_2 $ \textbf{Output1 from AlphaSense sensors}',
-         ylabel=r'$ NO_2 $ \textit{op1 (mV)}', ylim=[190, 300],
-         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
+         ylabel=r'$ NO_2 $ \textit{op1 (mV)}', ylim=[210, 265],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)],
+         ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals,
+                                ['25%', '25%'], 1, ids=ids)
 
   no2_figs.append(fig)
   no2_fignames.append('no2-op1.svg')
 
   fig, ax = plotting.ts_plot(epochs, no2_op2_vals,
          title=r'$ NO_2 $ \textbf{Output2 from AlphaSense sensors}',
-         ylabel=r'$ NO_2 $ \textit{op2 (mV)}', ylim=[190, 300],
-         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)])
+         ylabel=r'$ NO_2 $ \textit{op2 (mV)}', ylim=[210, 250],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)],
+         ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals,
+                                 ['25%', '25%'], 1, ids=ids)
 
   no2_figs.append(fig)
   no2_fignames.append('no2-op2.svg')
@@ -298,20 +303,24 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   fig, ax = plotting.ts_plot(epochs, ox_op1_vals,
          title=r'$ OX (NO_2 + O_3) $ \textbf{Output 1 from AlphaSense sensors}',
-         ylabel=r'$ OX $ \textit{op1 (mV)}',# ylim=[190, 300],
-         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
+         ylabel=r'$ OX $ \textit{op1 (mV)}', ylim=[210, 265],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)],
+         ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals,
+                                ['25%', '25%'], 1, ids=ids)
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op1.svg')
 
   fig, ax = plotting.ts_plot(epochs, ox_op2_vals,
          title=r'$ OX (NO_2 + O_3) $ \textbf{Output 2 from AlphaSense sensors}',
-         ylabel=r'$ OX $ \textit{op2 (mV)}',# ylim=[190, 300],
-         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)])
+         ylabel=r'$ OX $ \textit{op2 (mV)}', ylim=[210, 250],
+         leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)],
+         ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals, ['35%', '35%'], 1)
+  fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals,
+                                ['25%', '25%'], 1, ids=ids)
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op2.svg')
@@ -367,7 +376,8 @@ def regress_df(data, temps_present=False, hum_present=False,
         title = r'\textbf{True and Predicted concentrations of }'
               + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
         ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference conc.', 'Predicted conc.'])
+        leg_labels=['Reference conc.', 'Predicted conc.'],
+        ids=[0,(j+1)])
 
     text = get_corr_txt(t_series[:, 0], t_series[:, 1])
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
@@ -381,7 +391,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     fig, ax = plotting.ts_plot(epochs, t_series,
         title = r'\textbf{True and Predicted concentrations of } $ O_3 $',
         ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference conc.', 'Predicted conc.'])
+        leg_labels=['Reference conc.', 'Predicted conc.'],
+        ids=[0, (j+1)])
 
     text = get_corr_txt(t_series[:, 0], t_series[:, 1])
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
@@ -420,13 +431,13 @@ def regress_df(data, temps_present=False, hum_present=False,
             title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
-            leg_labels=["Residual error"])
+            leg_labels=["Residual error"], ids=[(j+1)])
 
-      fig_o, ax = plotting.ts_plot(epochs, resid_ox,
+      fig_o, ax = plotting.ts_plot(epochs, resid_o3,
             title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
-            leg_labels=["Residual error"])
+            leg_labels=["Residual error"], ids=[(j+1)])
 
     else:
       fig_n, ax = plotting.compare_ts_plot(epochs, resid_no2, temp[j],
@@ -434,7 +445,8 @@ def regress_df(data, temps_present=False, hum_present=False,
                + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}",
             ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
-            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
+            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
+            ids=[(j+1), -1])
 
       # compute r^2 between residual and temperature
       p = np.polyfit(temp[j].astype(float), resid_no2.astype(float), 1)
@@ -456,7 +468,9 @@ def regress_df(data, temps_present=False, hum_present=False,
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}",
             ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
-            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"])
+            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
+            ids=[(j+1), -1])
+
 
       p = np.polyfit(temp[j].astype(float), resid_ox.astype(float), 1)
       r2 = stats.coeff_deter(temp[j].astype(float), resid_ox.astype(float))
@@ -559,7 +573,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     fig, ax = plotting.ts_plot(epochs, no2_y_pred,
           title = r'\textbf{Comparison of } $ NO_2 $ \textbf{ predictions from SATVAM sensors}',
           ylabel= r'\textit{Concentration of } $ NO_2 $  (ppb)',
-          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)])
+          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)],
+          ids=range(1, len(no2_x)+1))
     
     txt = get_corr_txt(no2_y_pred[:, 0], no2_y_pred[:, 1])
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
@@ -571,7 +586,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     fig, ax = plotting.ts_plot(epochs, o3_y_pred,
           title = r'\textbf{Comparison of } $ O_3 $ \textbf{ predictions from SATVAM sensors}',
           ylabel= r'\textit{Concentration of } $ O_3 $  (ppb)',
-          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)])
+          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)],
+          ids=range(1, len(no2_x)+1))
     
     txt = get_corr_txt(o3_y_pred[:, 0], o3_y_pred[:, 1])
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
@@ -624,6 +640,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     leg_labels = [('Coefficient set %d' % i) for i in range(1,
           np.shape(mean_no2_coeffs)[1] + 1)]
     leg_labels.insert(0, 'Reference conc')
+    ids = range(0, mean_no2_coeffs.shape[1]+1)
 
     no2 = np.concatenate((no2, np.ones([np.shape(no2)[0], 1])), axis=1)
     t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]),
@@ -633,7 +650,7 @@ def regress_df(data, temps_present=False, hum_present=False,
         title = r'\textbf{Comparison of predicted values for }'
               + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
         ylabel = r'Concentration (ppb)',
-        leg_labels=leg_labels)
+        leg_labels=leg_labels, ids=ids)
 
     for i in range(1, np.size(t_series, axis=1)):
       text = get_corr_txt(t_series[:, i].astype(float),
@@ -650,6 +667,7 @@ def regress_df(data, temps_present=False, hum_present=False,
     leg_labels = [('Coefficient set %d' % i) for i in range(1,
           np.shape(mean_ox_coeffs)[1] + 1)]
     leg_labels.insert(0, 'Reference conc')
+    ids = range(0, mean_ox_coeffs.shape[1]+1)
 
     ox = np.concatenate((ox, np.ones([np.shape(ox)[0], 1])), axis=1)
     t_series = np.concatenate((np.reshape(ox_y, [np.size(ox_y), 1]),

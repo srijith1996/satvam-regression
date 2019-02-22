@@ -160,7 +160,7 @@ def format_x_date(fig, ax):
   plt.xticks(rotation=30)
 # ------------------------------------------------------------------------------
 def ts_plot(epochs, Y, title='', ylabel='',
-            ylim=None, leg_labels=None):
+            ylim=None, leg_labels=None, ids=[]):
   '''
      Plot a time-series of columns of Y
 
@@ -185,15 +185,19 @@ def ts_plot(epochs, Y, title='', ylabel='',
   if ylim != None:
     ax.set_ylim(ylim)
 
+  if ids == []:
+    ids = range(1, np.size(Y, axis=1)+1)
+
   handles = []
   if np.size(Y) == np.shape(Y)[0]:
-    ax.plot(epochs, Y, alpha=0.6, linewidth=1.0, color=colorWheel[7])
-    handles.append(mpatches.Patch(color=colorWheel[7]))
+    ax.plot(epochs, Y, alpha=0.6, linewidth=1.0, color=colorWheel[ids[0]])
+    handles.append(mpatches.Patch(color=colorWheel[ids[0]]))
+
   else:
     for (i, col) in enumerate(Y.T):
       ax.plot(epochs, col, alpha=0.6,
-            linewidth=1.0, color=colorWheel[i%len(colorWheel)])
-      handles.append(mpatches.Patch(color=colorWheel[i%len(colorWheel)]))
+            linewidth=0.7, color=colorWheel[ids[i]])
+      handles.append(mpatches.Patch(color=colorWheel[ids[i]]))
 
   # legend
   if leg_labels != None:
@@ -203,7 +207,7 @@ def ts_plot(epochs, Y, title='', ylabel='',
 # ------------------------------------------------------------------------------
 def compare_ts_plot(epochs, y1, y2, title='', ylabel='',
                     ylabel_s='', ylim_p=None, ylim_s=None,
-                    leg_labels=None):
+                    leg_labels=None, ids=[]):
   '''
      Plot a time-series on twin axes comparing the y1 and y2
 
@@ -236,11 +240,14 @@ def compare_ts_plot(epochs, y1, y2, title='', ylabel='',
   if ylim_s != None:
     ax2.set_ylim(ylim_s)
 
+  if ids == []:
+    ids = range(1, np.size(Y, axis=1)+1)
+
   # plot residuals and temperatures
-  handle_1 = ax.scatter(epochs, y1, alpha=0.5, marker='.',
-                        linewidths=0.3, color=colorWheel[2])
-  handle_2 = ax2.scatter(epochs, y2, alpha=0.5, marker='.',
-                         linewidths=0.3, color=colorWheel[5])
+  handle_1 = ax.scatter(epochs, y1, alpha=0.4, marker='.',
+                        linewidths=0.2, color=colorWheel[ids[0]])
+  handle_2 = ax2.scatter(epochs, y2, alpha=0.4, marker='.',
+                         linewidths=0.2, color=colorWheel[ids[1]])
 
   # legend
   if leg_labels != None:
@@ -327,7 +334,7 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
 
   return fig, means, medians
 # ------------------------------------------------------------------------------
-def plot_hist(ax, v, bins=20, title=''):
+def plot_hist(ax, v, bins=20, title='', ids=None):
   '''
     Plot the histogram of samples in v
   '''
@@ -335,13 +342,16 @@ def plot_hist(ax, v, bins=20, title=''):
   if np.size(v) == v.shape[0]:
     v = np.reshape(v, [np.size(v), 1])
 
+  if ids == None:
+    ids = xrange(v.shape[1])
+
   for (i, col) in enumerate(v.T):
     n, out_bins, patches = ax.hist(v[:,i], bins, density=True,
-         facecolor=colorWheel[i], alpha=0.6)
+         facecolor=colorWheel[ids[i]], alpha=0.6)
   set_plot_labels(ax, title='', xlabel=title, ylabel='')
 
 # ------------------------------------------------------------------------------
-def inset_hist_fig(fig, outer_ax, v, size, loc):
+def inset_hist_fig(fig, outer_ax, v, size, loc, ids=None):
   '''
     Inset histogram into the outer_ax at location.
 
@@ -359,7 +369,8 @@ def inset_hist_fig(fig, outer_ax, v, size, loc):
   in_axes = inset_axes(outer_ax, width=size[0],
           height=size[1], loc=loc)
 
-  plot_hist(in_axes, v, bins=200, title=r'Distribution')
+
+  plot_hist(in_axes, v, bins=200, title=r'Distribution', ids=ids)
 
   return fig
 # ------------------------------------------------------------------------------
