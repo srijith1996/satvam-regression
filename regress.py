@@ -12,6 +12,7 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 import time
 import sys
+import datetime
 
 import plotting
 import stats
@@ -28,7 +29,7 @@ def get_corr_txt(y_true, y_pred, add_title=''):
     y_pred = np.reshape(y_pred, [np.size(y_pred), 1])
 
   rmse = stats.rmse(y_true, y_pred)
-  mape = stats.mape(y_true, y_pred)
+  #mape = stats.mape(y_true, y_pred)
   mae  = stats.mae(y_true, y_pred)
   pearson = stats.pearson(y_true, y_pred)
   coeff_det = stats.coeff_deter(y_true, y_pred)
@@ -37,7 +38,7 @@ def get_corr_txt(y_true, y_pred, add_title=''):
   text = text + '\n' + r'$ R^2  = %g $' % stats.round_sig(coeff_det, 4)
   text = text + '\n' + r'$ MAE  = %g $' % stats.round_sig(mae, 4)
   text = text + '\n' + r'$ RMSE = %g $' % stats.round_sig(rmse, 4)
-  text = text + '\n' + r'$ MAPE = %g\%% $' % stats.round_sig(mape, 4)
+  #text = text + '\n' + r'$ MAPE = %g\%% $' % stats.round_sig(mape, 4)
   text = text + '\n' + r'$ r_P  = %g $' % stats.round_sig(pearson, 4)
 
   return text
@@ -112,6 +113,17 @@ def clean_data(X, sigma_mult):
   print "%d entries dropped" % (sizex - len(X))
 
   return X
+# ------------------------------------------------------------------------------
+def watermark(ax, loc, add_string):
+
+  ts = time.time()
+  st = datetime.datetime.fromtimestamp(ts).strftime('%Y/%m/%d %H:%M:%S')
+  txt = r'\textit{' + add_string + '}\n'
+  txt += r'\textbf{Deployed Location}: ' + loc + '\n'
+  txt += r'\textbf{Plotted on}: ' + st
+
+  return txt
+  
 # ------------------------------------------------------------------------------
 def regress_df(data, temps_present=False, hum_present=False,
                incl_temps=False, incl_op2t=False,
@@ -248,6 +260,8 @@ def regress_df(data, temps_present=False, hum_present=False,
          leg_labels=[r'$ NO_2 $ conc (ppb)'], ids=[0])
 
   fig = plotting.inset_hist_fig(fig, ax, no2_y, ['25%', '25%'], 1, ids=[0])
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   no2_figs.append(fig)
   no2_fignames.append('no2-ref')
@@ -258,6 +272,8 @@ def regress_df(data, temps_present=False, hum_present=False,
          leg_labels=['$ O_3 $ conc (ppb)'], ids=[0])
 
   fig = plotting.inset_hist_fig(fig, ax, o3_y, ['25%', '25%'], 1, ids=[0])
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   o3_figs.append(fig)
   o3_fignames.append('o3-ref')
@@ -282,6 +298,8 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals,
                                 ['25%', '25%'], 1, ids=ids)
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   no2_figs.append(fig)
   no2_fignames.append('no2-op1')
@@ -294,6 +312,8 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals,
                                  ['25%', '25%'], 1, ids=ids)
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   no2_figs.append(fig)
   no2_fignames.append('no2-op2')
@@ -310,6 +330,8 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals,
                                 ['25%', '25%'], 1, ids=ids)
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op1')
@@ -322,6 +344,8 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals,
                                 ['25%', '25%'], 1, ids=ids)
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op2')
@@ -388,7 +412,12 @@ def regress_df(data, temps_present=False, hum_present=False,
         ids=[0,(j+1)])
 
     text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+    print stats.coeff_deter(t_series[:, 0], t_series[:, 1])
+    print text
+    corr_text_no2.append(text)
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
     no2_figs.append(fig)
     no2_fignames.append('no2-sens%d-predict-true-comp' % (j+1))
@@ -404,7 +433,10 @@ def regress_df(data, temps_present=False, hum_present=False,
         ids=[0, (j+1)])
 
     text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+    corr_text_o3.append(text)
     ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
     o3_figs.append(fig)
     o3_fignames.append('o3-sens%d-predict-true-comp' % (j+1))
@@ -422,12 +454,16 @@ def regress_df(data, temps_present=False, hum_present=False,
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
             leg_labels=["Residual error"], ids=[(j+1)])
+      #txt = watermark(ax, loc_label, '')
+      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
       fig_o, ax = plotting.ts_plot(epochs, resid_o3,
             title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
             leg_labels=["Residual error"], ids=[(j+1)])
+      #txt = watermark(ax, loc_label, '')
+      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
     else:
       fig_n, ax = plotting.compare_ts_plot(epochs, resid_no2, temp[j],
@@ -451,11 +487,13 @@ def regress_df(data, temps_present=False, hum_present=False,
       ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
               plot_str2, ha="center", va="top")
 
-      ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.7, 0.9),
-                  xycoords="axes fraction")
+      #ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.7, 0.9),
+      #            xycoords="axes fraction")
+      #txt = watermark(ax, loc_label, '')
+      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
     
       # for O3
-      fig_o, ax = plotting.compare_ts_plot(epochs, resid_ox, temp[j],
+      fig_o, ax = plotting.compare_ts_plot(epochs, resid_o3, temp[j],
             title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
                 + str(j + 1) + ")}",
             ylabel=r"\textit{Residuals (ppb)}",
@@ -476,6 +514,8 @@ def regress_df(data, temps_present=False, hum_present=False,
       
       ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.9, 0.9),
                   xycoords="axes fraction")
+      #txt = watermark(ax, loc_label, '')
+      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
     
 
     no2_figs.append(fig_n)
@@ -490,6 +530,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax = fig.add_subplot(111)
     plotting.set_plot_labels(ax, title="Autocorrelation of $ NO_2 $ residuals",
         xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
     fig = plot_acf(pd.Series(resid_no2).values, ax=ax, lags=np.arange(0, 2000, 10))
 
     no2_figs.append(fig)
@@ -500,17 +542,21 @@ def regress_df(data, temps_present=False, hum_present=False,
     ax = fig.add_subplot(111)
     plotting.set_plot_labels(ax, title="Autocorrelation of $ O_3 $ residuals",
         xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
-    fig = plot_acf(pd.Series(resid_ox).values, ax=ax, lags=np.arange(0, 2000, 10))
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+    fig = plot_acf(pd.Series(resid_o3).values, ax=ax, lags=np.arange(0, 2000, 10))
 
     o3_figs.append(fig)
     o3_fignames.append("o3-sens%d-autocorr" % (j+1))
 
     print "Sensor %d DONE" % (j+1)
 
+  mean_no2_coeffs = np.array(mean_no2_coeffs).T
+  mean_ox_coeffs = np.array(mean_ox_coeffs).T
 
   # plot comparison of predicted values
-  no2_y_pred = np.array(no2_y_pred).T
-  o3_y_pred = np.array(o3_y_pred).T
+  no2_y_pred = np.round(np.array(no2_y_pred).T, decimals=6)
+  o3_y_pred = np.round(np.array(o3_y_pred).T, decimals=6)
 
   # TODO: Make legend labels more generic
   if len(no2_x) > 1:
@@ -522,6 +568,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     
     txt = get_corr_txt(no2_y_pred[:, 0], no2_y_pred[:, 1])
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
     no2_figs.append(fig)
     no2_fignames.append('no2-predicted-comp')
@@ -535,6 +583,8 @@ def regress_df(data, temps_present=False, hum_present=False,
     
     txt = get_corr_txt(o3_y_pred[:, 0], o3_y_pred[:, 1])
     ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
     o3_figs.append(fig)
     o3_fignames.append('o3-predicted-comp')
@@ -543,48 +593,44 @@ def regress_df(data, temps_present=False, hum_present=False,
   coeffs_no2 = np.array(coeffs_no2)
   coeffs_ox = np.array(coeffs_ox)
 
-  mean_no2_coeffs = []
-  mean_ox_coeffs = []
-  print coeffs_no2_names
   for i in xrange(coeffs_no2.shape[2]):
-    fig, means, medians = plotting.plot_violin(coeffs_no2[:, :, i].T,
+    fig, ax = plotting.plot_violin(coeffs_no2[:, :, i].T,
         title=r"\textbf{Coefficient of %s for } $ NO_2 $" % coeffs_no2_names[i],
         ylabel=r"\textit{Coefficient of %s}" % coeffs_no2_names[i],
         xlabel=r"\textbf{Sensors}")
 
-    print means
-    mean_no2_coeffs.append(means)
-    #print medians
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
     no2_figs.append(fig)
     no2_fignames.append('no2-coeff%d-violin' % (i + 1))
 
   for i in xrange(coeffs_ox.shape[2]):
-    fig, means, medians = plotting.plot_violin(coeffs_ox[:, :, i].T,
+    fig, ax = plotting.plot_violin(coeffs_ox[:, :, i].T,
         title=r"\textbf{Coefficient of %s for } $ O_3 $" % coeffs_ox_names[i],
         ylabel=r"\textit{Coefficient of %s}" % coeffs_ox_names[i],
         xlabel=r"\textbf{Sensors}")
 
-    print means
-    mean_ox_coeffs.append(means)
-    #print medians
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
     o3_figs.append(fig)
     o3_fignames.append('o3-coeff%d-violin' % (i + 1))
   # -------------------------------------------------------------------------
 
-
   # plot time series of sensors predicted using all different coefficients
   for (j, no2) in enumerate(no2_x):
     
-    leg_labels = [('Coefficient set %d' % i) for i in range(1,
+    leg_labels = [('Trained on Sensor %d (Set %d)' % (i, i)) for i in range(1,
           np.shape(mean_no2_coeffs)[1] + 1)]
     leg_labels.insert(0, 'Reference conc')
     ids = range(0, mean_no2_coeffs.shape[1]+1)
 
     no2 = np.concatenate((no2, np.ones([np.shape(no2)[0], 1])), axis=1)
+    t_series = np.dot(no2, mean_no2_coeffs)
     t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]),
-        np.dot(no2, mean_no2_coeffs)), axis=1)
+                              t_series), axis=1)
+    t_series = np.round(t_series, decimals=CONF_DECIMALS)
 
     fig, ax = plotting.ts_plot(epochs, t_series,
         title = r'\textbf{Comparison of predicted values for }'
@@ -593,18 +639,24 @@ def regress_df(data, temps_present=False, hum_present=False,
         leg_labels=leg_labels, ids=ids)
 
     for i in range(1, np.size(t_series, axis=1)):
-      text = get_corr_txt(t_series[:, i].astype(float),
-        t_series[:, 0].astype(float), add_title='Set %d' % i)
+      text = get_corr_txt(t_series[:, 0],
+          t_series[:, i], add_title='(Set %d)' % i)
+
+      print stats.coeff_deter(t_series[:, 0], t_series[:, i])
+      print text
 
       x = i / 5.0
       ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
     no2_figs.append(fig)
     no2_fignames.append('no2-coeffs-predict-sens%d' % (j + 1))
 
   for (j, ox) in enumerate(ox_x):
     
-    leg_labels = [('Coefficient set %d' % i) for i in range(1,
+    leg_labels = [('Trained on Sensor %d (set %d)' % (i, i)) for i in range(1,
           np.shape(mean_ox_coeffs)[1] + 1)]
     leg_labels.insert(0, 'Reference conc')
     ids = range(0, mean_ox_coeffs.shape[1]+1)
@@ -612,28 +664,82 @@ def regress_df(data, temps_present=False, hum_present=False,
     ox = np.concatenate((ox, np.ones([np.shape(ox)[0], 1])), axis=1)
     t_series = np.concatenate((np.reshape(ox_y, [np.size(ox_y), 1]),
         np.dot(ox, mean_ox_coeffs)), axis=1)
+    t_series = np.round(t_series, decimals=CONF_DECIMALS)
 
     fig, ax = plotting.ts_plot(epochs, t_series,
         title = r'\textbf{Comparison of predicted values for }'
               + r'$ OX $ \textbf{ (Sensor %d)}' % (j + 1),
         ylabel = r'Concentration (ppb)',
-        leg_labels=leg_labels)
+        leg_labels=leg_labels, ids=ids)
 
     for i in range(1, np.size(t_series, axis=1)):
-      text = get_corr_txt(t_series[:, i].astype(float),
-        t_series[:, 0].astype(float), add_title='Set %d' % i)
+      text = get_corr_txt(t_series[:, 0],
+        t_series[:, i], add_title='(Set %d)' % i)
 
       x = i / 5.0
       ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
+
     o3_figs.append(fig)
     o3_fignames.append('ox-coeffs-predict-sens%d' % (j + 1))
 
+  # ----------------------------------------------------------------------------
+  no2_x_agg = no2_x[0]
+  ox_x_agg = ox_x[0]
+  no2_y_agg = np.tile(no2_y, len(no2_x))
+  ox_y_agg = np.tile(ox_y, len(ox_x))
+
+  for i in range(1, len(no2_x)):
+    no2_x_agg = np.concatenate((no2_x_agg, no2_x[i]), axis=0)
+    ox_x_agg = np.concatenate((ox_x_agg, ox_x[i]), axis=0)
+  
+  coeffs_no2 = regress_once(no2_x_agg, no2_y_agg)
+  print coeffs_no2
+  coeffs_ox = regress_once(ox_x_agg, ox_y_agg)
+  print coeffs_ox
+
+  for i in xrange(len(no2_x)):
+    tmp = np.concatenate((no2_x[i], np.ones([no2_x[i].shape[0], 1])), axis=1)
+    predict_no2 = np.dot(tmp, np.reshape(coeffs_no2,
+                                            [np.size(coeffs_no2), 1]))
+    tmp = np.concatenate((ox_x[i], np.ones([ox_x[i].shape[0], 1])), axis=1)
+    predict_o3 = np.dot(tmp, np.reshape(coeffs_ox,
+                              [np.size(coeffs_ox), 1])) - predict_no2
+
+    t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]), predict_no2), axis=1)
+    fig, ax = plotting.ts_plot(epochs, t_series,
+        title = r'\textbf{Prediction for $ NO_2 $ after training using mixed dataset}'
+              + r'\textbf{ (Sensor %d)}' % (i + 1),
+        ylabel = r'Concentration (ppb)',
+        leg_labels=['Reference', 'Sensor %d' % (i + 1)],
+        ids=[0, i+1])
+    
+    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+
+    ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
+    no2_figs.append(fig)
+    no2_fignames.append('no2-mixed-pred-sens%d' % (i + 1))
+
+    t_series = np.concatenate((np.reshape(o3_y, [np.size(o3_y), 1]), predict_o3), axis=1)
+    fig, ax = plotting.ts_plot(epochs, t_series,
+        title = r'\textbf{Prediction for $ O_3 $ after training using mixed dataset}'
+              + r'\textbf{ (Sensor %d)}' % (i + 1),
+        ylabel = r'Concentration (ppb)',
+        leg_labels=['Reference', 'Sensor %d' % (i + 1)],
+        ids=[0, i+1])
+    
+    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+
+    ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
+    o3_figs.append(fig)
+    o3_fignames.append('o3-mixed-pred-sens%d' % (i + 1))
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 
 # ----------------------------------------------------------------------------------
-def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
+def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False, loc_label='---'):
   
   # list of all figures plotted
   figs = []
@@ -698,6 +804,9 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
     x = i / 5.0
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
+
   figs.append(fig)
   fignames.append('pm1-comp')
 
@@ -713,6 +822,9 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
     x = i / 5.0
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
 
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
+
   figs.append(fig)
   fignames.append('pm10-comp')
 
@@ -727,6 +839,9 @@ def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False):
 
     x = i / 5.0
     ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+  
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
 
   figs.append(fig)
   fignames.append('pm25-comp')
