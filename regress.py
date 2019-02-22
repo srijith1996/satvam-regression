@@ -31,7 +31,7 @@ def get_corr_txt(y_true, y_pred, add_title=''):
   mape = stats.mape(y_true, y_pred)
   mae  = stats.mae(y_true, y_pred)
   pearson = stats.pearson(y_true, y_pred)
-  r2 = stats.coeff_deter(y_true, y_pred)
+  coeff_det = stats.coeff_deter(y_true, y_pred)
 
   text = r'\textbf{Correlation Stats %s}'% add_title
   text = text + '\n' + r'$ R^2  = %g $' % stats.round_sig(coeff_det, 4)
