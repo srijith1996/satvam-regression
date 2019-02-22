@@ -151,10 +151,10 @@ def format_x_date(fig, ax):
   ax.xaxis.set_minor_locator(minorLocator)
  
   ax.grid(b=True, which='major', axis='both',
-          color='gray', linestyle='--', alpha=0.35)
+          color='gray', linestyle='--', alpha=0.5)
   
-  ax.grid(b=True, which='minor', axis='x',
-          color='gray', linestyle=':', alpha=0.25)
+  ax.grid(b=True, which='minor', axis='both',
+          color='gray', linestyle=':', alpha=0.3)
   
   ax.set_xlabel(r'\textbf{Time}')
   plt.xticks(rotation=30)
