@@ -377,6 +377,7 @@ def inset_hist_fig(fig, outer_ax, v, size, loc, ids=None):
   in_axes = inset_axes(outer_ax, width=size[0],
           height=size[1], loc=loc)
 
+  in_axes.patch.set_alpha(0.6)
 
   plot_hist(in_axes, v, bins=200, title=r'Distribution', ids=ids)
 
