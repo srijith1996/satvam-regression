@@ -409,25 +409,6 @@ def regress_df(data, temps_present=False, hum_present=False,
     o3_figs.append(fig)
     o3_fignames.append('o3-sens%d-predict-true-comp.svg' % (j+1))
 
-    # plot regression surface
-    #print "plotting regression surface"
-    #fig = plotting.plot_reg_plane(no2_x_train, no2_y_train,
-    #                 [reg_no2.intercept_, reg_no2.coef_[0], reg_no2.coef_[1]],
-    #                 title=r'\textbf{Outputs vs. ppb on training set}',
-    #                 xlabel=r'\textbf{sensor output WE (mV)}',
-    #                 ylabel=r'\textbf{sensor output AE (mV)}',
-    #                 zlabel=r'$ NO_2 $\textit{concentration (ppb)}')
-    #figs.append(fig)
-
-    #fig = plotting.plot_reg_plane(no2_x_test, no2_y_test,
-    #                 [reg_no2.intercept_, reg_no2.coef_[0], reg_no2.coef_[1]],
-    #                 title=r'\textbf{Outputs vs. ppb on test set}',
-    #                 xlabel=r'\textbf{sensor output WE (mV)}',
-    #                 ylabel=r'\textbf{sensor output AE (mV)}',
-    #                 zlabel=r'$ NO_2 $\textit{concentration (ppb)}')
-    #figs.append(fig)
-
-
     # plot residuals wrt time
     print "plotting residual characteristics"
     ylim_p = [-150, 50]
@@ -524,54 +505,6 @@ def regress_df(data, temps_present=False, hum_present=False,
     o3_figs.append(fig)
     o3_fignames.append("o3-sens%d-autocorr.svg" % (j+1))
 
-    #print "plotting PACF"
-    #fig = plt.figure()
-    #ax = fig.add_subplot(111)
-    #plotting.set_plot_labels(ax, title="PACF of $ NO_2 $ residuals",
-    #    xlabel="Lag", ylabel=r"\textit{PACF}")
-    #fig = plot_pacf(pd.Series(resid_no2).values, ax=ax, lags=np.arange(0, 2000, 10))
-
-    #no2_figs.append(fig)
-    #no2_fignames.append("no2-sens%d-pacf.svg" % (j+1))
-  # -------------------------------------------------------------------------
-
-    # time-series forecast residuals ARIMA
-    #print "computing ARIMA model"
-    #arima_model = ARIMA(resid_no2, order=(1440, 0, 1440))
-    #model_fit = arima_model.fit(disp=5)
-
-    #print "forecasting training set values"
-    #predict_resid_no2 = model_fit.predict(start=None, end=None)
-    #predict_resid_no2 = np.concatenate(([0], predict_resid_no2), axis=0)
-
-    #plot_var = np.zeros([np.size(resid_no2), 2])
-    #plot_var[:, 0] = resid_no2
-    #plot_var[:, 1] = predict_resid_no2
-
-    #fig = plt.figure()
-    #ax = fig.add_subplot('111')
-    #ax.plot(epochs, resid_no2, 'b')
-    #ax.plot(epochs, predict_resid_no2, 'r')
-    #fig.show()
-
-  # ---------------------------- VISUALIZATION ------------------------------
-    #print "plotting forecasted model"
-    #fig, ax = plotting.ts_plot(epochs, plot_var,
-    #      title = r'\textbf{Time-series forecasted} $ NO_2 $ \textbf{residuals: ARIMA model}',
-    #      ylabel= r'\textit{Residual error}',
-    #      leg_labels=['Actual error', 'Forecasted error'])
-
-    #txt = get_corr_txt(plot_var[:, 1], plot_var[:, 0])
-    #ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
-
-    #no2_figs.append(fig)
-    #no2_fignames.append('no2-sens%d-arima-forecast.svg' % (j+1))
-  
-    #fig = plotting.plot_violin(resid_no2,
-    #       title="Violin-plot of residual errors from multifold regression",
-    #       xlabel="Runs", ylabel="Residual error", scale=[-50, 50])
-
-    #figs.append(fig)
     print "Sensor %d DONE" % (j+1)
 
 
