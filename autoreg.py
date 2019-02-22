@@ -281,7 +281,7 @@ no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:]
 
 if DEPLOYMENT != 1:
   temp = np.empty([len(time_vec), NUM_SENSORS])
-  #hum = np.empty([len(time_vec), NUM_SENSORS])
+  hum = np.empty([len(time_vec), NUM_SENSORS])
   pm1 = np.empty([len(time_vec), NUM_SENSORS])
   pm25 = np.empty([len(time_vec), NUM_SENSORS])
   pm10 = np.empty([len(time_vec), NUM_SENSORS])
@@ -301,7 +301,7 @@ for i in xrange(NUM_SENSORS):
 
   if DEPLOYMENT != 1:
     sens_temp = sens_dfs[i][TEMP_FIELD_HDR].values
-    #sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
+    sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
     sens_pm1 = sens_dfs[i][PM1_FIELD_HDR].values
     sens_pm25 = sens_dfs[i][PM25_FIELD_HDR].values
     sens_pm10 = sens_dfs[i][PM10_FIELD_HDR].values
@@ -317,6 +317,7 @@ for i in xrange(NUM_SENSORS):
 
     if DEPLOYMENT != 1:
       temp[ts_index, i] = sens_temp[j]
+      hum[ts_index, i] = sens_hum[j]
       pm1[ts_index, i] = sens_pm1[j]
       pm25[ts_index, i] = sens_pm25[j]
       pm10[ts_index, i] = sens_pm10[j]
@@ -371,6 +372,7 @@ aggregate_list.append(ref_o3)
 for i in xrange(NUM_SENSORS):
   if DEPLOYMENT != 1:
     aggregate_list.append(temp[:, i].tolist())
+    aggregate_list.append(hum[:, i].tolist())
   aggregate_list.append(no2_op1[:, i].tolist())
   aggregate_list.append(no2_op2[:, i].tolist())
   aggregate_list.append(ox_op1[:, i].tolist())
@@ -383,12 +385,15 @@ print "Data set size (after dropna()): " + str(len(target_df.index))
 print "Calling regression algorithm on obtained DataFrame"
 
 t_present = True
+h_present = True
 if DEPLOYMENT == 1:
   t_present = False
+  h_present = False
 
 no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
-        temps_present=t_present, incl_temps=True, incl_op2t=True, clean=3,
-        runs=1000)
+        temps_present=t_present, incl_temps=True, incl_op2t=True,
+        hum_present=h_present, incl_hum=False, incl_op2h=False, clean=3,
+        runs=200, loc_label=DEPLOY_SITE)
 #pages = pdfpublish.generate_text()
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')

@@ -112,9 +112,10 @@ def clean_data(X, sigma_mult):
 
   return X
 # ------------------------------------------------------------------------------
-def regress_df(data, temps_present=False,
+def regress_df(data, temps_present=False, hum_present=False,
                incl_temps=False, incl_op2t=False,
-               clean=3, runs = 1000):
+               incl_hum=False, incl_op2h=False,
+               clean=3, runs=1000, loc_label='---'):
 
   # list of all figures plotted
   no2_figs = []
@@ -137,8 +138,9 @@ def regress_df(data, temps_present=False,
   print "Test set size: \t", (np.size(data, 0) - train_size)
 
   no2_x = []
-  temp = []
   ox_x = []
+  temp = []
+  hum = []
 
   no2_y_pred = []
   o3_y_pred = []
@@ -149,10 +151,19 @@ def regress_df(data, temps_present=False,
   # column locations for no2, ox and temperature data of the ith sensor
   col_skip = 3
 
-  if temps_present:
+  if temps_present and hum_present:
+    col_temp = (lambda i: (col_skip + 6*i))
+    col_hum = (lambda i: (col_skip + 6*i + 1))
+    col_no2 = (lambda i: range((col_skip + 6*i + 2),(col_skip + 6*i + 4)))
+    col_ox = (lambda i: range((col_skip + 6*i + 4),(col_skip + 6*i + 6)))
+  elif hum_present:
+    col_hum = (lambda i: (col_skip + 5*i))
     col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
     col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
+  elif temps_present:
     col_temp = (lambda i: (col_skip + 5*i))
+    col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
+    col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
   else:
     col_no2 = (lambda i: range((col_skip + 4*i),(col_skip + 4*i + 2)))
     col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
@@ -163,19 +174,30 @@ def regress_df(data, temps_present=False,
   no2_y = data.values[:,1]
   o3_y = data.values[:,2]
 
-  if temps_present and incl_temps:
-    coeffs_no2_names.append('temp')
-    coeffs_ox_names.append('temp')
+  if temps_present:
+    if incl_temps:
+      coeffs_no2_names.append('temp')
+      coeffs_ox_names.append('temp')
 
-  if temps_present and incl_op2t:
-    coeffs_no2_names.append('op2T')
-    coeffs_ox_names.append('op2T')
+    if incl_op2t:
+      coeffs_no2_names.append('op2T')
+      coeffs_ox_names.append('op2T')
+
+  if hum_present:
+    if incl_hum:
+      coeffs_no2_names.append('hum')
+      coeffs_ox_names.append('hum')
+
+    if incl_op2h:
+      coeffs_no2_names.append('op2h')
+      coeffs_ox_names.append('op2h')
+      
 
   coeffs_no2_names.append('constant')
   coeffs_ox_names.append('constant')
     
   for i in xrange(np.size(data.values, 1)):
-    if col_ox(i)[1] >= np.size(data.values, 1):
+    if col_ox(i)[-1] >= np.size(data.values, 1):
       break
 
     tmp_idx_n = col_no2(i)
@@ -186,6 +208,12 @@ def regress_df(data, temps_present=False,
       if incl_temps:
         tmp_idx_n.append(col_temp(i))
         tmp_idx_o.append(col_temp(i))
+
+    if hum_present:
+      hum.append(data.values[:,col_hum(i)])
+      if incl_hum:
+        tmp_idx_n.append(col_hum(i))
+        tmp_idx_o.append(col_hum(i))
 
     no2_x.append(data.values[:,tmp_idx_n])
     ox_x.append(data.values[:,tmp_idx_o])
@@ -198,6 +226,15 @@ def regress_df(data, temps_present=False,
 
       no2_x[i] = np.concatenate((no2_x[i], no2_op2t), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op2t), axis=1)
+
+    if hum_present and incl_op2h:
+      no2_op2h = np.reshape(data.values[:, col_no2(i)[1]]
+        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
+      ox_op2h = np.reshape(data.values[:, col_ox(i)[1]]
+        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op2h), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op2h), axis=1)
 
   # convert o3 to ox for regression
   ox_y = o3_y + no2_y
