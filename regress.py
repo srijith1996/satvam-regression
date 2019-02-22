@@ -84,12 +84,10 @@ def regress_once(X, y, train_size=0.7, intercept=True):
   #print "R^2 training set: \t", reg.score(X_train, y_train)
   #print "R^2 test set: \t", reg.score(X_test, y_test)
     
-  predict = reg.predict(X)
-  residue = y - predict
   coeffs = reg.coef_.tolist()
   coeffs.append(reg.intercept_)
 
-  return coeffs, predict, residue
+  return coeffs
 # ------------------------------------------------------------------------------
 def clean_data(X, sigma_mult):
   
@@ -336,14 +334,13 @@ def regress_df(data, temps_present=False, hum_present=False,
   #we_zero_offsets = [227, 229, 222]
   #ae_zero_offsets = [228, 230, 221]
 
-  resid_no2 = np.zeros([len(no2_y), 1])
-  resid_ox = np.zeros([len(ox_y), 1])
   coeffs_no2 = []
   coeffs_ox = []
+  mean_no2_coeffs = []
+  mean_ox_coeffs = []
+  corr_text_no2 = []
+  corr_text_o3 = []
 
-  predict_no2 = []
-  predict_o3 = []
-  
   for j in xrange(len(no2_x)):
     print "Sensor: " + str(j + 1)
     coeffs_no2.append([])
@@ -353,21 +350,29 @@ def regress_df(data, temps_present=False, hum_present=False,
 
       sys.stdout.write("\rEpoch ............ %d" % (i+1))
 
-      coeffs, predict_no2, resid_no2 = regress_once(no2_x[j],
-          no2_y, training_set_ratio)
-      
+      coeffs = regress_once(no2_x[j], no2_y, training_set_ratio)
       coeffs_no2[j].append(coeffs)
     
-      coeffs, predict, resid_ox = regress_once(ox_x[j],
-          ox_y, training_set_ratio)
-      
+      coeffs = regress_once(ox_x[j], ox_y, training_set_ratio)
       coeffs_ox[j].append(coeffs)
-      predict_o3 = predict - predict_no2
 
     print "\n"
 
-    no2_y_pred.append(predict_no2)
-    o3_y_pred.append(predict_o3)
+    mean_no2_coeffs.append(np.mean(coeffs_no2[j], axis=0))
+    mean_ox_coeffs.append(np.mean(coeffs_ox[j], axis=0))
+
+    tmp = np.concatenate((no2_x[j], np.ones([np.shape(no2_x[j])[0], 1])), axis=1)
+    predict_no2 = np.dot(tmp, mean_no2_coeffs[j].T)
+
+    # if no rounding is done, the output seems to change after a few decimals
+    no2_y_pred.append(predict_no2.tolist())
+    resid_no2 = no2_y - predict_no2
+
+    tmp = np.concatenate((ox_x[j], np.ones([np.shape(ox_x[j])[0], 1])), axis=1)
+    predict_o3 = np.dot(tmp, mean_ox_coeffs[j].T) - predict_no2
+    o3_y_pred.append(predict_o3.tolist())
+    resid_o3 = o3_y - predict_o3
+
   # -------------------------------------------------------------------------
 
   # ---------------------------- VISUALIZATION ------------------------------

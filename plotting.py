@@ -340,7 +340,7 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
   ax.legend(custom_lines, ['Mean', 'Median'],shadow='True',
             fontsize=13,ncol=1,loc='upper left')  
 
-  return fig, means, medians
+  return fig, ax
 # ------------------------------------------------------------------------------
 def plot_hist(ax, v, bins=20, title='', ids=None):
   '''
