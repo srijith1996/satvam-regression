@@ -149,7 +149,7 @@ def format_x_date(fig, ax):
   ax.xaxis.set_major_locator(majorLocator)
   ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_date))
   ax.xaxis.set_minor_locator(minorLocator)
- 
+
   ax.grid(b=True, which='major', axis='both',
           color='gray', linestyle='--', alpha=0.5)
   
@@ -193,11 +193,19 @@ def ts_plot(epochs, Y, title='', ylabel='',
     ax.plot(epochs, Y, alpha=0.6, linewidth=1.0, color=colorWheel[ids[0]])
     handles.append(mpatches.Patch(color=colorWheel[ids[0]]))
 
+    mean_line = Line2D([epochs], np.repeat(np.mean(Y), np.size(epochs)),
+                       linewidth=1.0, color=colorWheel[ids[0]])
+    ax.add_line(mean_line)
+
   else:
     for (i, col) in enumerate(Y.T):
       ax.plot(epochs, col, alpha=0.6,
             linewidth=0.7, color=colorWheel[ids[i]])
       handles.append(mpatches.Patch(color=colorWheel[ids[i]]))
+
+      mean_line = Line2D([epochs], np.repeat(np.mean(col), np.size(epochs)),
+                       linewidth=1.0, color=colorWheel[ids[i]])
+      ax.add_line(mean_line)
 
   # legend
   if leg_labels != None:
