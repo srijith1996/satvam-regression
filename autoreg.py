@@ -74,13 +74,13 @@ if DEPLOY_SITE == 'MRIU':
 
   REF_TS_FORMAT = '%m/%d/%y %H:%M'
   REF_DATE_FORMAT = '%m/%d/%y'
-  #EBAM_TS_FORMAT = '%d-%m-%Y %H:%M'
-  EBAM_TS_FORMAT = '%d/%m/%y %H:%M'
+  EBAM_TS_FORMAT = '%d-%m-%Y %H:%M'
+  #EBAM_TS_FORMAT = '%d/%m/%y %H:%M'
 
   # EBAM data fields
   EBAM_HEADER_ROW = 0
   EBAM_TS_FIELD_HDR = 'Time'
-  EBAM_PM25_FIELD_HDR = 'ConcRT (mg/m3)'
+  EBAM_PM25_FIELD_HDR = 'ConcRT(mg/m3)'
 
 elif DEPLOY_SITE == 'MPCB':
 
@@ -235,12 +235,16 @@ if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   print "Processing EBAM data........"
   
   ebam_df = pd.read_csv(EBAM_FILE, header=EBAM_HEADER_ROW)
+
+  ebam_df.dropna()
   
-  #ebam_df = ebam_df[ebam_df.applymap(lambda x:
-  #            (x != "NoData" and x != "NO_DATA"
-  #         and x != "RS232" and x != "CALIB_S"
-  #         and x != "CALIB_Z" and x != "FAULTY"
-  #         and x != "Samp<")).all(1)].dropna()
+  # These strings do not exist in the file,
+  # This statement gets rid of the "string not float" error
+  ebam_df = ebam_df[ebam_df.applymap(lambda x:
+              (x != "NoData" and x != "NO_DATA"
+           and x != "RS232" and x != "CALIB_S"
+           and x != "CALIB_Z" and x != "FAULTY"
+           and x != "Samp<")).all(1)].dropna()
   
   print "Interpreting time stamps...."
   times = ebam_df[EBAM_TS_FIELD_HDR].values
