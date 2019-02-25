@@ -26,7 +26,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 # -------------------------------------------------------------------------------
 # Change this field to 'MPCB' or 'MRIU' based on deployment site
-DEPLOY_SITE = 'MRIU'
+DEPLOY_SITE = 'MPCB'
 DEPLOYMENT = 2
 
 DEPLOY_SITE = DEPLOY_SITE.upper()
@@ -406,7 +406,7 @@ for (i, fig) in enumerate(no2_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + no2_names[i] + '.svg', format='svg')
+  fig.savefig(DIR_PREFIX + no2_names[i] + '.png', format='png')
   plt.close(fig)
 
 pdf.close()
@@ -421,7 +421,7 @@ for (i, fig) in enumerate(o3_figs):
   text = 'Figure %d' % (i + 1)
   plt.text(0.05, 0.95, text, transform=fig.transFigure, size=10)
   pdf.savefig(fig)
-  fig.savefig(DIR_PREFIX + o3_names[i] + '.svg', format='svg')
+  fig.savefig(DIR_PREFIX + o3_names[i] + '.png', format='png')
   plt.close(fig)
 
 pdf.close()
@@ -451,7 +451,8 @@ if DEPLOYMENT > 1:
   if DEPLOY_SITE == 'MPCB':
     incl_pm10 = True
 
-  figs, names = regress.pm_correlate(target_df, ref_pm10_incl=incl_pm10)
+  figs, names = regress.pm_correlate(target_df, ref_pm10_incl=incl_pm10,
+                                     loc_label=DEPLOY_SITE)
 
   pdf = PdfPages(OUT_FILE_PREFIX + '-pm.pdf')
 

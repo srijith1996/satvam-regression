@@ -7,3 +7,6 @@
 # compilation and tmp files
 *.pyc
 *~
+
+# data files
+*.dat

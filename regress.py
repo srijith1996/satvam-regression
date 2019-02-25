@@ -18,7 +18,12 @@ import plotting
 import stats
 # ------------------------------------------------------------------------------
 CONF_DECIMALS = 6
-
+# ------------------------------------------------------------------------------
+# list of all figures plotted
+no2_figs = []
+o3_figs = []
+no2_fignames = []
+o3_fignames = []
 # ------------------------------------------------------------------------------
 def get_corr_txt(y_true, y_pred, add_title=''):
 
@@ -29,17 +34,17 @@ def get_corr_txt(y_true, y_pred, add_title=''):
     y_pred = np.reshape(y_pred, [np.size(y_pred), 1])
 
   rmse = stats.rmse(y_true, y_pred)
-  #mape = stats.mape(y_true, y_pred)
+  mape = stats.mape(y_true, y_pred)
   mae  = stats.mae(y_true, y_pred)
   pearson = stats.pearson(y_true, y_pred)
   coeff_det = stats.coeff_deter(y_true, y_pred)
 
   text = r'\textbf{Correlation Stats %s}'% add_title
-  text = text + '\n' + r'$ R^2  = %g $' % stats.round_sig(coeff_det, 4)
-  text = text + '\n' + r'$ MAE  = %g $' % stats.round_sig(mae, 4)
-  text = text + '\n' + r'$ RMSE = %g $' % stats.round_sig(rmse, 4)
-  #text = text + '\n' + r'$ MAPE = %g\%% $' % stats.round_sig(mape, 4)
-  text = text + '\n' + r'$ r_P  = %g $' % stats.round_sig(pearson, 4)
+  text = text + '\n' + r'$ R^2  = %g $' % coeff_det
+  text = text + '\n' + r'$ MAE  = %g $' % mae
+  text = text + '\n' + r'$ RMSE = %g $' % rmse
+  text = text + '\n' + r'$ MAPE = %g\%% $' % mape
+  text = text + '\n' + r'$ r_P  = %g $' % pearson
 
   return text
 # ------------------------------------------------------------------------------
@@ -55,40 +60,27 @@ def regress_once(X, y, train_size=0.7, intercept=True):
 
   X_train = X_[:train_size, :]
   y_train = y_[:train_size]
-
   X_test = X_[train_size:, :]
   y_test = y_[train_size:]
 
-  # TODO: subtracting zero offsets
-  #no2_x_train[0] -= we_zero_offsets[j]
-  #no2_x_train[1] -= ae_zero_offsets[j]
-    
   # train model
   reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
     
-  # TODO: Publish to report
-  #print "Regression coefficients: \t", reg_no2.coef_
-  #print "Regression intercept: \t", reg_no2.intercept_
-  #print "coeff of AE: \t", -(reg_no2.coef_[1] /reg_no2.coef_[0])
-  #print "sensitivity: \t", 1/reg_no2.coef_[0]
-  
   # test model
+  metrics = []
   pred = reg.predict(X_test)
-  dev = stats.mae(y_test, pred)
-  #print "Deviation measure L2 test set: \t", dev
+  metrics.append(stats.mae(y_test, pred))
+  metrics.append(stats.rmse(y_test, pred))
+  metrics.append(stats.mape(y_test, pred))
 
   # training model
   pred = reg.predict(X_train)
   dev = stats.mae(y_train, pred)
-  #print "Deviation measure L2 training set: \t", dev
-      
-  #print "R^2 training set: \t", reg.score(X_train, y_train)
-  #print "R^2 test set: \t", reg.score(X_test, y_test)
-    
+
   coeffs = reg.coef_.tolist()
   coeffs.append(reg.intercept_)
 
-  return coeffs
+  return coeffs, metrics
 # ------------------------------------------------------------------------------
 def clean_data(X, sigma_mult):
   
@@ -123,136 +115,9 @@ def watermark(ax, loc, add_string):
   txt += r'\textbf{Plotted on}: ' + st
 
   return txt
-  
 # ------------------------------------------------------------------------------
-def regress_df(data, temps_present=False, hum_present=False,
-               incl_temps=False, incl_op2t=False,
-               incl_hum=False, incl_op2h=False,
-               clean=3, runs=1000, loc_label='---'):
+def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
 
-  # list of all figures plotted
-  no2_figs = []
-  o3_figs = []
-
-  no2_fignames = []
-  o3_fignames = []
-  
-  # remove outliers
-  data = clean_data(data, clean)
-
-  # remove possible outliers
-  #tmp_data = pd.DataFrame(data.iloc[:, 0])
-  #data = data[tmp_data.applymap(lambda x: x < 200).all(1)]
-
-  training_set_ratio = 0.7
-
-  train_size = int(np.floor(training_set_ratio * data.shape[0]))
-  print "Training set size: \t", train_size
-  print "Test set size: \t", (np.size(data, 0) - train_size)
-
-  no2_x = []
-  ox_x = []
-  temp = []
-  hum = []
-
-  no2_y_pred = []
-  o3_y_pred = []
-
-  coeffs_no2_names = ['op1', 'op2']
-  coeffs_ox_names = ['op1', 'op2']
-
-  # column locations for no2, ox and temperature data of the ith sensor
-  col_skip = 3
-
-  if temps_present and hum_present:
-    col_temp = (lambda i: (col_skip + 6*i))
-    col_hum = (lambda i: (col_skip + 6*i + 1))
-    col_no2 = (lambda i: range((col_skip + 6*i + 2),(col_skip + 6*i + 4)))
-    col_ox = (lambda i: range((col_skip + 6*i + 4),(col_skip + 6*i + 6)))
-  elif hum_present:
-    col_hum = (lambda i: (col_skip + 5*i))
-    col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
-    col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
-  elif temps_present:
-    col_temp = (lambda i: (col_skip + 5*i))
-    col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
-    col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
-  else:
-    col_no2 = (lambda i: range((col_skip + 4*i),(col_skip + 4*i + 2)))
-    col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
-
-  epochs = data.values[:,0]
-
-  # store x and y values
-  no2_y = data.values[:,1]
-  o3_y = data.values[:,2]
-
-  if temps_present:
-    if incl_temps:
-      coeffs_no2_names.append('temp')
-      coeffs_ox_names.append('temp')
-
-    if incl_op2t:
-      coeffs_no2_names.append('op2T')
-      coeffs_ox_names.append('op2T')
-
-  if hum_present:
-    if incl_hum:
-      coeffs_no2_names.append('hum')
-      coeffs_ox_names.append('hum')
-
-    if incl_op2h:
-      coeffs_no2_names.append('op2h')
-      coeffs_ox_names.append('op2h')
-      
-
-  coeffs_no2_names.append('constant')
-  coeffs_ox_names.append('constant')
-    
-  for i in xrange(np.size(data.values, 1)):
-    if col_ox(i)[-1] >= np.size(data.values, 1):
-      break
-
-    tmp_idx_n = col_no2(i)
-    tmp_idx_o = col_ox(i)
-
-    if temps_present:
-      temp.append(data.values[:,col_temp(i)])
-      if incl_temps:
-        tmp_idx_n.append(col_temp(i))
-        tmp_idx_o.append(col_temp(i))
-
-    if hum_present:
-      hum.append(data.values[:,col_hum(i)])
-      if incl_hum:
-        tmp_idx_n.append(col_hum(i))
-        tmp_idx_o.append(col_hum(i))
-
-    no2_x.append(data.values[:,tmp_idx_n])
-    ox_x.append(data.values[:,tmp_idx_o])
-
-    if temps_present and incl_op2t:
-      no2_op2t = np.reshape(data.values[:, col_no2(i)[1]]
-        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
-      ox_op2t = np.reshape(data.values[:, col_ox(i)[1]]
-        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
-
-      no2_x[i] = np.concatenate((no2_x[i], no2_op2t), axis=1)
-      ox_x[i] = np.concatenate((ox_x[i], ox_op2t), axis=1)
-
-    if hum_present and incl_op2h:
-      no2_op2h = np.reshape(data.values[:, col_no2(i)[1]]
-        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
-      ox_op2h = np.reshape(data.values[:, col_ox(i)[1]]
-        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
-
-      no2_x[i] = np.concatenate((no2_x[i], no2_op2h), axis=1)
-      ox_x[i] = np.concatenate((ox_x[i], ox_op2h), axis=1)
-
-  # convert o3 to ox for regression
-  ox_y = o3_y + no2_y
-
-  # ---------------------------- VISUALIZATION ------------------------------
   # visualize time-series of ref data
   fig, ax = plotting.ts_plot(epochs, no2_y,
          title=r'$ NO_2 $\textbf{ readings from Reference monitor}',
@@ -349,43 +214,314 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   o3_figs.append(fig)
   o3_fignames.append('o3-op2')
-  # -------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+def plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
+                       predict_o3, j, comp_witht=False, temps=None):
 
-  # ---------------------------MULTIFOLD REGRESSION--------------------------
+  # plot predicted vs. true ppb
+  print "plotting actual and predicted values: NO2"
+  t_series = np.array([no2_y, predict_no2]).T
+  fig, ax = plotting.ts_plot(epochs, t_series,
+        title = r'\textbf{True and Predicted concentrations of }'
+              + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
+        ylabel = r'Concentration (ppb)',
+        leg_labels=['Reference conc.', 'Predicted conc.'],
+        ids=[0,(j+1)])
+
+  text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+  ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+
+  no2_figs.append(fig)
+  no2_fignames.append('no2-sens%d-predict-true-comp' % (j+1))
+
+  print "plotting actual and predicted values: O3"
+  t_series = np.array([o3_y, predict_o3]).T
+  fig, ax = plotting.ts_plot(epochs, t_series,
+        title = r'\textbf{True and Predicted concentrations of } $ O_3 $',
+        ylabel = r'Concentration (ppb)',
+        leg_labels=['Reference conc.', 'Predicted conc.'],
+        ids=[0, (j+1)])
+
+  text = get_corr_txt(t_series[:, 0], t_series[:, 1])
+  ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+
+  o3_figs.append(fig)
+  o3_fignames.append('o3-sens%d-predict-true-comp' % (j+1))
+
+  # plot residuals wrt time
+  print "plotting residual characteristics"
+  ylim_p = [-150, 50]
+  ylim_s = [0, 45]
+  resid_no2 = no2_y - predict_no2
+  resid_o3 = o3_y - predict_o3
+  fig_n = None
+  fig_o = None
+
+  if not comp_witht:
+    fig_n, ax = plotting.ts_plot(epochs, resid_no2,
+          title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
+              + str(j + 1) + ")}",
+          ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
+          leg_labels=["Residual error"], ids=[(j+1)])
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+
+    fig_o, ax = plotting.ts_plot(epochs, resid_o3,
+          title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
+              + str(j + 1) + ")}",
+          ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
+          leg_labels=["Residual error"], ids=[(j+1)])
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+
+  else:
+    fig_n, ax = plotting.compare_ts_plot(epochs, resid_no2, temps,
+          title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
+             + str(j + 1) + ")}",
+          ylabel=r"\textit{Residuals (ppb)}",
+          ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
+          ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
+          ids=[(j+1), -1])
+
+    # compute r^2 between residual and temperature
+    p = np.polyfit(temps.astype(float), resid_no2.astype(float), 1)
+    r = stats.pearson(temps.astype(float), resid_no2.astype(float))
+
+    plot_str = "$ e = %g * T + %g $" % (stats.round_sig(p[0], 4),
+          stats.round_sig(p[1], 4))
+    plot_str2 = "$ {r}_{e,T} = %.4f $" % stats.round_sig(r, 4)
+
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
+            plot_str, ha="center", va="bottom")
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
+            plot_str2, ha="center", va="top")
+
+    #ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.7, 0.9),
+    #            xycoords="axes fraction")
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+  
+    # for O3
+    fig_o, ax = plotting.compare_ts_plot(epochs, resid_o3, temps,
+          title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
+              + str(j + 1) + ")}",
+          ylabel=r"\textit{Residuals (ppb)}",
+          ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
+          ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
+          ids=[(j+1), -1])
+
+
+    p = np.polyfit(temps.astype(float), resid_o3.astype(float), 1)
+    r = stats.pearson(temps.astype(float), resid_o3.astype(float))
+
+    plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
+    plot_str2 = "$ {r}_{e,T} = %.4f $" % r
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
+            plot_str, ha="center", va="bottom")
+    ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
+            plot_str2, ha="center", va="top")
+    
+    ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.9, 0.9),
+                xycoords="axes fraction")
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+  
+  no2_figs.append(fig_n)
+  no2_fignames.append('no2-sens%d-res-temp-comp' % (j+1))
+  
+  o3_figs.append(fig_o)
+  o3_fignames.append('o3-sens%d-res-temp-comp' % (j+1))
+
+  # plot autocorrelation of residuals
+  print "plotting autocorrelation of residuals"
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  plotting.set_plot_labels(ax, title="Autocorrelation of $ NO_2 $ residuals",
+      xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+  fig = plot_acf(pd.Series(resid_no2).values, ax=ax, lags=np.arange(0, 2000, 10))
+
+  no2_figs.append(fig)
+  no2_fignames.append("no2-sens%d-autocorr" % (j+1))
+
+  print "plotting autocorrelation of residuals"
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  plotting.set_plot_labels(ax, title="Autocorrelation of $ O_3 $ residuals",
+      xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
+  #txt = watermark(ax, loc_label, '')
+  #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+  fig = plot_acf(pd.Series(resid_o3).values, ax=ax, lags=np.arange(0, 2000, 10))
+
+  o3_figs.append(fig)
+  o3_fignames.append("o3-sens%d-autocorr" % (j+1))
+# ------------------------------------------------------------------------------
+def regress_df(data, temps_present=False, hum_present=False,
+               incl_temps=False, incl_op2t=False,
+               incl_hum=False, incl_op2h=False,
+               clean=3, runs=1000, loc_label='---'):
+
+  # remove outliers
+  data = clean_data(data, clean)
+
+  # remove possible outliers
+  #tmp_data = pd.DataFrame(data.iloc[:, 0])
+  #data = data[tmp_data.applymap(lambda x: x < 200).all(1)]
+
+  training_set_ratio = 0.7
+
+  train_size = int(np.floor(training_set_ratio * data.shape[0]))
+  print "Training set size: \t", train_size
+  print "Test set size: \t", (np.size(data, 0) - train_size)
+
+  no2_x = []
+  ox_x = []
+  temp = []
+  hum = []
+
+  no2_y_pred = []
+  o3_y_pred = []
+
+  coeffs_no2_names = ['op1', 'op2']
+  coeffs_ox_names = ['op1', 'op2']
+
+  # column locations for no2, ox and temperature data of the ith sensor
+  col_skip = 3
+
+  if temps_present and hum_present:
+    col_temp = (lambda i: (col_skip + 6*i))
+    col_hum = (lambda i: (col_skip + 6*i + 1))
+    col_no2 = (lambda i: range((col_skip + 6*i + 2),(col_skip + 6*i + 4)))
+    col_ox = (lambda i: range((col_skip + 6*i + 4),(col_skip + 6*i + 6)))
+  elif hum_present:
+    col_hum = (lambda i: (col_skip + 5*i))
+    col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
+    col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
+  elif temps_present:
+    col_temp = (lambda i: (col_skip + 5*i))
+    col_no2 = (lambda i: range((col_skip + 5*i + 1),(col_skip + 5*i + 3)))
+    col_ox = (lambda i: range((col_skip + 5*i + 3),(col_skip + 5*i + 5)))
+  else:
+    col_no2 = (lambda i: range((col_skip + 4*i),(col_skip + 4*i + 2)))
+    col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
+
+  epochs = data.values[:,0]
+
+  # store x and y values
+  no2_y = data.values[:,1]
+  o3_y = data.values[:,2]
+
+  if temps_present:
+    if incl_temps:
+      coeffs_no2_names.append('temp')
+      coeffs_ox_names.append('temp')
+
+    if incl_op2t:
+      coeffs_no2_names.append('op2T')
+      coeffs_ox_names.append('op2T')
+
+  if hum_present:
+    if incl_hum:
+      coeffs_no2_names.append('hum')
+      coeffs_ox_names.append('hum')
+
+    if incl_op2h:
+      coeffs_no2_names.append('op2h')
+      coeffs_ox_names.append('op2h')
+      
+  coeffs_no2_names.append('constant')
+  coeffs_ox_names.append('constant')
+    
+  for i in xrange(np.size(data.values, 1)):
+    if col_ox(i)[-1] >= np.size(data.values, 1):
+      break
+
+    tmp_idx_n = col_no2(i)
+    tmp_idx_o = col_ox(i)
+
+    if temps_present:
+      temp.append(data.values[:,col_temp(i)])
+      if incl_temps:
+        tmp_idx_n.append(col_temp(i))
+        tmp_idx_o.append(col_temp(i))
+
+    if hum_present:
+      hum.append(data.values[:,col_hum(i)])
+      if incl_hum:
+        tmp_idx_n.append(col_hum(i))
+        tmp_idx_o.append(col_hum(i))
+
+    no2_x.append(data.values[:,tmp_idx_n])
+    ox_x.append(data.values[:,tmp_idx_o])
+
+    if temps_present and incl_op2t:
+      no2_op2t = np.reshape(data.values[:, col_no2(i)[1]]
+        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
+      ox_op2t = np.reshape(data.values[:, col_ox(i)[1]]
+        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op2t), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op2t), axis=1)
+
+    if hum_present and incl_op2h:
+      no2_op2h = np.reshape(data.values[:, col_no2(i)[1]]
+        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
+      ox_op2h = np.reshape(data.values[:, col_ox(i)[1]]
+        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op2h), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op2h), axis=1)
+
+  # convert o3 to ox for regression
+  ox_y = o3_y + no2_y
+
+  visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
+
   # process and regress data: multifold
-
-  # TODO
-  #we_zero_offsets = [227, 229, 222]
-  #ae_zero_offsets = [228, 230, 221]
-
   coeffs_no2 = []
   coeffs_ox = []
   mean_no2_coeffs = []
   mean_ox_coeffs = []
-  corr_text_no2 = []
-  corr_text_o3 = []
+
+  maes_no2 = []
+  maes_o3 = []
+  rmses_no2 = []
+  rmses_o3 = []
+  mapes_no2 = []
+  mapes_o3 = []
 
   for j in xrange(len(no2_x)):
     print "Sensor: " + str(j + 1)
     coeffs_no2.append([])
     coeffs_ox.append([])
+
+    maes_no2.append([])
+    rmses_no2.append([])
+    mapes_no2.append([])
+
+    maes_o3.append([])
+    rmses_o3.append([])
+    mapes_o3.append([])
   
     for i in xrange(runs):
-
       sys.stdout.write("\rEpoch ............ %d" % (i+1))
 
-      coeffs = regress_once(no2_x[j], no2_y, training_set_ratio)
+      coeffs, metrics = regress_once(no2_x[j], no2_y, training_set_ratio)
       coeffs_no2[j].append(coeffs)
+      maes_no2[j].append(metrics[0])
+      rmses_no2[j].append(metrics[1])
+      mapes_no2[j].append(metrics[2])
 
-      #no2_y_tmp = no2_y - coeffs[-1]
-
-      #coeffs_new, pred_no2_new, resid_no2_new = regress_once(no2_x[j],
-      #    no2_y_tmp, training_set_ratio, intercept=False)
-
-      #print "Residue after subtracting const \t\t%.3f" % stats.mae(pred_no2_new, no2_y_tmp)
-    
-      coeffs = regress_once(ox_x[j], ox_y, training_set_ratio)
+      coeffs, metrics = regress_once(ox_x[j], ox_y, training_set_ratio)
       coeffs_ox[j].append(coeffs)
+      maes_o3[j].append(metrics[0])
+      rmses_o3[j].append(metrics[1])
+      mapes_o3[j].append(metrics[2])
 
     print "\n"
 
@@ -394,168 +530,19 @@ def regress_df(data, temps_present=False, hum_present=False,
 
     tmp = np.concatenate((no2_x[j], np.ones([np.shape(no2_x[j])[0], 1])), axis=1)
     predict_no2 = np.dot(tmp, mean_no2_coeffs[j].T)
-
-    # if no rounding is done, the output seems to change after a few decimals
     no2_y_pred.append(predict_no2.tolist())
-    resid_no2 = no2_y - predict_no2
 
     tmp = np.concatenate((ox_x[j], np.ones([np.shape(ox_x[j])[0], 1])), axis=1)
     predict_o3 = np.dot(tmp, mean_ox_coeffs[j].T) - predict_no2
     o3_y_pred.append(predict_o3.tolist())
-    resid_o3 = o3_y - predict_o3
 
-  # -------------------------------------------------------------------------
-
-  # ---------------------------- VISUALIZATION ------------------------------
-    # plot predicted vs. true ppb
-    print "plotting actual and predicted values: NO2"
-    t_series = np.round(np.array([no2_y, predict_no2]).T,
-                        decimals=CONF_DECIMALS)
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{True and Predicted concentrations of }'
-              + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
-        ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference conc.', 'Predicted conc.'],
-        ids=[0,(j+1)])
-
-    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
-    print stats.coeff_deter(t_series[:, 0], t_series[:, 1])
-    print text
-    corr_text_no2.append(text)
-    ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-
-    no2_figs.append(fig)
-    no2_fignames.append('no2-sens%d-predict-true-comp' % (j+1))
-
-    print "plotting actual and predicted values: O3"
-    t_series = np.round(np.array([o3_y, predict_o3]).T,
-                        decimals=CONF_DECIMALS)
-
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{True and Predicted concentrations of } $ O_3 $',
-        ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference conc.', 'Predicted conc.'],
-        ids=[0, (j+1)])
-
-    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
-    corr_text_o3.append(text)
-    ax.annotate(text, xy = (0.7, 0.75), xycoords='axes fraction')
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-
-    o3_figs.append(fig)
-    o3_fignames.append('o3-sens%d-predict-true-comp' % (j+1))
-
-    # plot residuals wrt time
-    print "plotting residual characteristics"
-    ylim_p = [-150, 50]
-    ylim_s = [0, 45]
-    
-    fig_n = None
-    fig_o = None
-    if not temps_present:
-      fig_n, ax = plotting.ts_plot(epochs, resid_no2,
-            title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
-                + str(j + 1) + ")}",
-            ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
-            leg_labels=["Residual error"], ids=[(j+1)])
-      #txt = watermark(ax, loc_label, '')
-      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-
-      fig_o, ax = plotting.ts_plot(epochs, resid_o3,
-            title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
-                + str(j + 1) + ")}",
-            ylabel=r"\textit{Residuals (ppb)}", ylim=ylim_p,
-            leg_labels=["Residual error"], ids=[(j+1)])
-      #txt = watermark(ax, loc_label, '')
-      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-
+    # visualize predictions
+    if temps_present:
+      plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
+                         predict_o3, j, comp_witht=temps_present, temps=temp[j])
     else:
-      fig_n, ax = plotting.compare_ts_plot(epochs, resid_no2, temp[j],
-            title=r"\textbf{Prediction errors (} $ NO_2 $ \textbf{) vs temperature (Sensor "
-               + str(j + 1) + ")}",
-            ylabel=r"\textit{Residuals (ppb)}",
-            ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
-            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
-            ids=[(j+1), -1])
-
-      # compute r^2 between residual and temperature
-      p = np.polyfit(temp[j].astype(float), resid_no2.astype(float), 1)
-      r = stats.pearson(temp[j].astype(float), resid_no2.astype(float))
-  
-      plot_str = "$ e = %g * T + %g $" % (stats.round_sig(p[0], 4),
-            stats.round_sig(p[1], 4))
-      plot_str2 = "$ {r}_{e,T} = %.4f $" % stats.round_sig(r, 4)
-
-      ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
-              plot_str, ha="center", va="bottom")
-      ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
-              plot_str2, ha="center", va="top")
-
-      #ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.7, 0.9),
-      #            xycoords="axes fraction")
-      #txt = watermark(ax, loc_label, '')
-      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
+      plot_ts_prediction(epochs, no2_y, predict_no2, o3_y, predict_o3, j)
     
-      # for O3
-      fig_o, ax = plotting.compare_ts_plot(epochs, resid_o3, temp[j],
-            title=r"\textbf{Prediction errors (} $ O_X $ \textbf{) vs temperature (Sensor "
-                + str(j + 1) + ")}",
-            ylabel=r"\textit{Residuals (ppb)}",
-            ylabel_s=r"\textit{Temperature} ($ ^{\circ} C $)", ylim_p=ylim_p,
-            ylim_s=ylim_s, leg_labels=["Residual error", "Temperature"],
-            ids=[(j+1), -1])
-
-
-      p = np.polyfit(temp[j].astype(float), resid_o3.astype(float), 1)
-      r = stats.pearson(temp[j].astype(float), resid_o3.astype(float))
-  
-      plot_str = "$ e = %.3f * T + %.3f $" % (p[0], p[1])
-      plot_str2 = "$ {r}_{e,T} = %.4f $" % r
-      ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
-              plot_str, ha="center", va="bottom")
-      ax.text((epochs[-1] + 3*epochs[0])/4, (ylim_p[0] + 19*ylim_p[1])/20,
-              plot_str2, ha="center", va="top")
-      
-      ax.annotate("$ e = y_{pred} - y_{true} $", xy=(0.9, 0.9),
-                  xycoords="axes fraction")
-      #txt = watermark(ax, loc_label, '')
-      #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-    
-
-    no2_figs.append(fig_n)
-    no2_fignames.append('no2-sens%d-res-temp-comp' % (j+1))
-    
-    o3_figs.append(fig_o)
-    o3_fignames.append('o3-sens%d-res-temp-comp' % (j+1))
-    
-    # plot autocorrelation of residuals
-    print "plotting autocorrelation of residuals"
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plotting.set_plot_labels(ax, title="Autocorrelation of $ NO_2 $ residuals",
-        xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-    fig = plot_acf(pd.Series(resid_no2).values, ax=ax, lags=np.arange(0, 2000, 10))
-
-    no2_figs.append(fig)
-    no2_fignames.append("no2-sens%d-autocorr" % (j+1))
-
-    print "plotting autocorrelation of residuals"
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plotting.set_plot_labels(ax, title="Autocorrelation of $ O_3 $ residuals",
-        xlabel="Lag", ylabel=r"\textit{Autocorrelation}")
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
-    fig = plot_acf(pd.Series(resid_o3).values, ax=ax, lags=np.arange(0, 2000, 10))
-
-    o3_figs.append(fig)
-    o3_fignames.append("o3-sens%d-autocorr" % (j+1))
-
     print "Sensor %d DONE" % (j+1)
 
   mean_no2_coeffs = np.array(mean_no2_coeffs).T
@@ -624,6 +611,8 @@ def regress_df(data, temps_present=False, hum_present=False,
 
     o3_figs.append(fig)
     o3_fignames.append('o3-coeff%d-violin' % (i + 1))
+
+  # compare error violins
   # -------------------------------------------------------------------------
 
   # plot time series of sensors predicted using all different coefficients
@@ -649,9 +638,6 @@ def regress_df(data, temps_present=False, hum_present=False,
     for i in range(1, np.size(t_series, axis=1)):
       text = get_corr_txt(t_series[:, 0],
           t_series[:, i], add_title='(Set %d)' % i)
-
-      print stats.coeff_deter(t_series[:, 0], t_series[:, i])
-      print text
 
       x = i / 5.0
       ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
@@ -711,10 +697,10 @@ def regress_df(data, temps_present=False, hum_present=False,
   for i in xrange(len(no2_x)):
     tmp = np.concatenate((no2_x[i], np.ones([no2_x[i].shape[0], 1])), axis=1)
     predict_no2 = np.dot(tmp, np.reshape(coeffs_no2,
-                                            [np.size(coeffs_no2), 1]))
+                                         [np.size(coeffs_no2), 1]))
     tmp = np.concatenate((ox_x[i], np.ones([ox_x[i].shape[0], 1])), axis=1)
     predict_o3 = np.dot(tmp, np.reshape(coeffs_ox,
-                              [np.size(coeffs_ox), 1])) - predict_no2
+                                   [np.size(coeffs_ox), 1])) - predict_no2
 
     t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]), predict_no2), axis=1)
     fig, ax = plotting.ts_plot(epochs, t_series,
