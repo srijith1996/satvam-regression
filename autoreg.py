@@ -394,7 +394,7 @@ if DEPLOYMENT == 1:
 no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
         temps_present=t_present, incl_temps=True, incl_op2t=True,
         hum_present=h_present, incl_hum=False, incl_op2h=False, clean=3,
-        runs=200, loc_label=DEPLOY_SITE)
+        runs=2000, loc_label=DEPLOY_SITE)
 #pages = pdfpublish.generate_text()
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')

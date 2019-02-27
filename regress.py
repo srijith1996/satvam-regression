@@ -42,10 +42,10 @@ def clean_data(X, sigma_mult):
   print "Cleaning x+-%dsigma" % sigma_mult
 
   X = X.replace([np.inf, -np.inf], np.nan).dropna()
-  sizex = len(X)
   # remove non-positive ppb values
   X = X[X.applymap(lambda x: x > 0).all(1)]
 
+  sizex = len(X)
   # remove values beyond +-sigma_mult * sigma
   mu = np.mean(X.values, axis=0)
   sigma = np.std(X.values, axis=0)
@@ -344,7 +344,7 @@ def plot_error_violins(metric, name='', full_name='', sens_type=''):
 
   # generate tick labels
   tick_labs = [('Train S%d' %x) for x in range(1, metric.shape[0]+1)]
-  tick_labs.append('Train Agg')
+  tick_labs.append('Train All')
 
   for i in xrange(metric.shape[0]):
     fig, ax = plotting.plot_violin(metric[i],
@@ -363,6 +363,34 @@ def plot_error_violins(metric, name='', full_name='', sens_type=''):
 
     figs.append(fig)
     fignames.append("%s-%s-sens%d" % (sens_type.lower(), name.lower(), (i + 1)))
+# ------------------------------------------------------------------------------
+def plot_coeff_violins(coeff, names=[], sens_type=''):
+
+  if len(names) == 0:
+    names = ['var%d'%x for x in range(1, coeff.shape[2] + 1)]
+
+  tick_labels = map(str, range(1, coeff.shape[1]))
+  tick_labels.append('All')
+
+  for i in xrange(coeff.shape[2]):
+    fig, ax = plotting.plot_violin(coeff[:, :, i],
+        title=r"\textbf{Coefficient of %s for } $ NO_2 $" % names[i],
+        ylabel=r"\textit{Coefficient of %s}" % names[i],
+        xlabel=r"\textit{Trained on Sensor}",
+        x_tick_labels=tick_labels)
+
+    #txt = watermark(ax, loc_label, '')
+    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
+
+    if sens_type == "NO_2":
+      figs = no2_figs
+      fignames = no2_fignames
+    else:
+      figs = o3_figs
+      fignames = o3_fignames
+
+    figs.append(fig)
+    fignames.append("%s-coeff%s" % (sens_type.lower(), names[i].lower()))
 # ==============================================================================
 # Routines for regression
 def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
@@ -651,6 +679,21 @@ def regress_df(data, temps_present=False, hum_present=False,
         full_name='Root Mean Square Error', sens_type='O_X');
   plot_error_violins(mapes_ox, name='MAPE',
         full_name='Mean Absolute Percentage Error', sens_type='O_X');
+
+  # ravel the first two dimensions
+  coeffs_no2 = np.reshape(coeffs_no2,
+        [coeffs_no2.shape[0] * coeffs_no2.shape[1],
+         coeffs_no2.shape[2],
+         coeffs_no2.shape[3]])
+
+  coeffs_ox = np.reshape(coeffs_ox,
+        [coeffs_ox.shape[0] * coeffs_ox.shape[1],
+         coeffs_ox.shape[2],
+         coeffs_ox.shape[3]])
+
+  # plot violins for coefficients
+  plot_coeff_violins(coeffs_no2, names=['op1', 'op2', 'const'], sens_type='NO_2')
+  plot_coeff_violins(coeffs_ox, names=['op1', 'op2', 'const'], sens_type='O_3')
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 
