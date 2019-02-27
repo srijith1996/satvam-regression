@@ -24,6 +24,53 @@ no2_figs = []
 o3_figs = []
 no2_fignames = []
 o3_fignames = []
+# ==============================================================================
+# Statistics routines
+def clean_data(X, sigma_mult):
+  '''
+     Clean data beyond sigma_mult standard deviations from the mean
+     in each column of X
+
+     Parameters:
+      X          - Dataset to clean
+      sigma_mult - Multiplying factor
+
+     Return:
+      X - cleaned dataset
+  '''
+  
+  print "Cleaning x+-%dsigma" % sigma_mult
+
+  X = X.replace([np.inf, -np.inf], np.nan).dropna()
+  sizex = len(X)
+  # remove non-positive ppb values
+  X = X[X.applymap(lambda x: x > 0).all(1)]
+
+  # remove values beyond +-sigma_mult * sigma
+  mu = np.mean(X.values, axis=0)
+  sigma = np.std(X.values, axis=0)
+  
+  ranges = [(mu - sigma_mult * sigma).tolist(),
+            (mu + sigma_mult * sigma).tolist()]
+
+  for i in xrange(1, X.values.shape[1]):
+    X = X[X.iloc[:,[i]].applymap(lambda x: (x > ranges[0][i]
+         and x < ranges[1][i])).all(1)]
+
+  print "%d entries dropped" % (sizex - len(X))
+
+  return X
+# ==============================================================================
+# Routines for visualization
+def watermark(ax, loc, add_string):
+
+  ts = time.time()
+  st = datetime.datetime.fromtimestamp(ts).strftime('%Y/%m/%d %H:%M:%S')
+  txt = r'\textit{' + add_string + '}\n'
+  txt += r'\textbf{Deployed Location}: ' + loc + '\n'
+  txt += r'\textbf{Plotted on}: ' + st
+
+  return txt
 # ------------------------------------------------------------------------------
 def get_corr_txt(y_true, y_pred, add_title=''):
 
@@ -47,74 +94,6 @@ def get_corr_txt(y_true, y_pred, add_title=''):
   text = text + '\n' + r'$ r_P  = %g $' % pearson
 
   return text
-# ------------------------------------------------------------------------------
-def regress_once(X, y, train_size=0.7, intercept=True):
-  
-  train_size = int(np.floor(train_size * X.shape[0]))
-
-  perm = np.arange(X.shape[0])
-  perm = np.random.permutation(perm)
-
-  X_ = X[perm, :]
-  y_ = y[perm]
-
-  X_train = X_[:train_size, :]
-  y_train = y_[:train_size]
-  X_test = X_[train_size:, :]
-  y_test = y_[train_size:]
-
-  # train model
-  reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
-    
-  # test model
-  metrics = []
-  pred = reg.predict(X_test)
-  metrics.append(stats.mae(y_test, pred))
-  metrics.append(stats.rmse(y_test, pred))
-  metrics.append(stats.mape(y_test, pred))
-
-  # training model
-  pred = reg.predict(X_train)
-  dev = stats.mae(y_train, pred)
-
-  coeffs = reg.coef_.tolist()
-  coeffs.append(reg.intercept_)
-
-  return coeffs, metrics
-# ------------------------------------------------------------------------------
-def clean_data(X, sigma_mult):
-  
-  print "Cleaning x+-%dsigma" % sigma_mult
-
-  sizex = len(X)
-  # remove non-positive ppb values
-  X = X[X.applymap(lambda x: x > 0).all(1)]
-
-  # remove values beyond +-sigma_mult * sigma
-  mu = np.mean(X.values, axis=0)
-  sigma = np.std(X.values, axis=0)
-  
-  ranges = [(mu - sigma_mult * sigma).tolist(),
-            (mu + sigma_mult * sigma).tolist()]
-
-  for i in xrange(1, X.values.shape[1]):
-    X = X[X.iloc[:,[i]].applymap(lambda x: (x > ranges[0][i]
-         and x < ranges[1][i])).all(1)]
-
-  X = X.replace([np.inf, -np.inf], np.nan).dropna()
-  print "%d entries dropped" % (sizex - len(X))
-
-  return X
-# ------------------------------------------------------------------------------
-def watermark(ax, loc, add_string):
-
-  ts = time.time()
-  st = datetime.datetime.fromtimestamp(ts).strftime('%Y/%m/%d %H:%M:%S')
-  txt = r'\textit{' + add_string + '}\n'
-  txt += r'\textbf{Deployed Location}: ' + loc + '\n'
-  txt += r'\textbf{Plotted on}: ' + st
-
-  return txt
 # ------------------------------------------------------------------------------
 def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
 
@@ -361,6 +340,169 @@ def plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
   o3_figs.append(fig)
   o3_fignames.append("o3-sens%d-autocorr" % (j+1))
 # ------------------------------------------------------------------------------
+def plot_error_violins(metric, name='', full_name='', sens_type=''):
+
+  # generate tick labels
+  tick_labs = [('Train S%d' %x) for x in range(1, metric.shape[0]+1)]
+  tick_labs.append('Train Agg')
+
+  for i in xrange(metric.shape[0]):
+    fig, ax = plotting.plot_violin(metric[i],
+        title=r'\textbf{%s - } $ %s $ \textbf{ Sensor %d}' % (
+                            name, sens_type, (i+1)),
+        xlabel=r'\textit{Tested on Sensor %d}' % (i+1),
+        ylabel=r'\textit{%s (%s)}' % (full_name, name),
+        x_tick_labels=tick_labs)
+
+    if sens_type == "NO_2":
+      figs = no2_figs
+      fignames = no2_fignames
+    else:
+      figs = o3_figs
+      fignames = o3_fignames
+
+    figs.append(fig)
+    fignames.append("%s-%s-sens%d" % (sens_type.lower(), name.lower(), (i + 1)))
+# ==============================================================================
+# Routines for regression
+def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
+  '''
+     Perform regression on the given data-set and return coefficients
+     and error metrics
+    
+     Parameters:
+      X      - Values of X in linear regression
+      y      - Values of y in linear regression
+      labels - For computation of error only values corresponding to
+               non-zero labels will be considered
+      train_size - ratio of the complete data-set used for training
+      intercept - Include intercept in regression
+
+     Return:
+      coeffs - Coefficients of regression
+      metrics - Array of metrics [MAE, RMSE, MAPE]
+   '''
+      
+  
+  train_size = int(np.floor(train_size * X.shape[0]))
+
+  perm = np.arange(X.shape[0])
+  perm = np.random.permutation(perm)
+
+  X_ = X[perm, :]
+  y_ = y[perm]
+
+  X_train = X_[:train_size, :]
+  y_train = y_[:train_size]
+  X_test = X_[train_size:, :]
+  y_test = y_[train_size:]
+
+  # train model
+  reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
+    
+  # test model
+  if labels is not None:
+    labels = labels[perm]
+    labels = labels[train_size:]
+    X_test = X_test[(labels != 0)]
+    y_test = y_test[(labels != 0)]
+
+  metrics = []
+  pred = reg.predict(X_test)
+  metrics.append(stats.mae(y_test, pred))
+  metrics.append(stats.rmse(y_test, pred))
+  metrics.append(stats.mape(y_test, pred))
+
+  # training model
+  pred = reg.predict(X_train)
+  dev = stats.mae(y_train, pred)
+
+  coeffs = reg.coef_.tolist()
+  coeffs.append(reg.intercept_)
+
+  return coeffs, metrics
+# ------------------------------------------------------------------------------
+def regress_sensor_type(X, y, train_ratio, runs):
+  '''
+     Train on all sensors of a certain type and obtain self
+     trained and cross trained error measures
+
+     Params:
+      X       - list of training inputs for each sensor
+      y       - training output values common to all
+      train_ratio - Ratio of training set to consider
+      runs    - Number of runs for each sensor
+
+     Return:
+      coeffs, maes, rmses, mapes
+
+      coeffs has shape [num_sensors, runs, (num_sensors + 1), num_coeffs]
+      maes, rmses and mapes have shape [num_sensors, runs, (num_sensors + 1)]
+  '''
+
+  # coefficients for all steps carried out
+  # shape: N * R * (N + 1) * m
+  coeffs = np.zeros([len(X), runs, (len(X) + 1), (1+np.shape(X[0])[1])])
+
+  # error metrics
+  # shape: N * R * (N + 1)
+  maes = np.zeros([len(X), runs, (len(X) + 1)])
+  rmses = np.zeros([len(X), runs, (len(X) + 1)]) 
+  mapes = np.zeros([len(X), runs, (len(X) + 1)]) 
+
+  for j in xrange(len(X)):
+
+    print "Sensor: " + str(j + 1)
+    for i in xrange(runs):
+
+      sys.stdout.write("\rRun ........ %d (%.2f%% complete)"
+                            % ((i+1), (i+1) * 100/runs))
+      for k in xrange(len(X)):
+
+        # Train on sensor k
+        tmpcoeffs, metrics = regress_once(X[k], y, train_size=train_ratio)
+        coeffs[j, i, k][:] = tmpcoeffs
+        maes[j, i, k] = metrics[0]
+        rmses[j, i, k] = metrics[1]
+        mapes[j, i, k] = metrics[2]
+
+      # build aggregate dataset
+      agg_X = []
+      agg_y = np.array([])
+      labels = np.zeros([len(X) * np.shape(X[0])[0],])
+      for (k, X_sensor) in enumerate(X):
+
+        agg_y = np.concatenate((agg_y, y), axis=0)
+        if k == 0:
+          agg_X = X_sensor
+        else:
+          agg_X = np.concatenate((agg_X, X_sensor), axis=0)
+
+        if k == j:
+          labels[k * np.shape(X[0])[0] : (k+1) * np.shape(X[0])[0]] = 1
+
+      # train on aggregate dataset
+      tmpcoeffs, metrics = regress_once(agg_X, agg_y,
+                    labels=labels, train_size=train_ratio)
+      coeffs[j, i, -1][:] = tmpcoeffs
+      maes[j, i, -1] = metrics[0]
+      rmses[j, i, -1] = metrics[1]
+      mapes[j, i, -1] = metrics[2]
+
+    print ""
+
+    # visualize predictions
+    #if temps_present:
+    #  plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
+    #                     predict_o3, j, comp_witht=temps_present, temps=temp[j])
+    #else:
+    #  plot_ts_prediction(epochs, no2_y, predict_no2, o3_y, predict_o3, j)
+    
+    print "Sensor %d DONE" % (j+1)
+
+  return coeffs, maes, rmses, mapes
+
+# ------------------------------------------------------------------------------
 def regress_df(data, temps_present=False, hum_present=False,
                incl_temps=False, incl_op2t=False,
                incl_hum=False, incl_op2h=False,
@@ -415,6 +557,9 @@ def regress_df(data, temps_present=False, hum_present=False,
   # store x and y values
   no2_y = data.values[:,1]
   o3_y = data.values[:,2]
+
+  # convert o3 to ox for regression
+  ox_y = o3_y + no2_y
 
   if temps_present:
     if incl_temps:
@@ -477,258 +622,35 @@ def regress_df(data, temps_present=False, hum_present=False,
       no2_x[i] = np.concatenate((no2_x[i], no2_op2h), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op2h), axis=1)
 
-  # convert o3 to ox for regression
-  ox_y = o3_y + no2_y
-
-  visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
+  #visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
 
   # process and regress data: multifold
-  coeffs_no2 = []
-  coeffs_ox = []
-  mean_no2_coeffs = []
-  mean_ox_coeffs = []
+  print "\nFor NO_2 sensors....."
+  coeffs_no2, maes_no2, rmses_no2, mapes_no2 = regress_sensor_type(
+        no2_x, no2_y, training_set_ratio, runs)
 
-  maes_no2 = []
-  maes_o3 = []
-  rmses_no2 = []
-  rmses_o3 = []
-  mapes_no2 = []
-  mapes_o3 = []
-
-  for j in xrange(len(no2_x)):
-    print "Sensor: " + str(j + 1)
-    coeffs_no2.append([])
-    coeffs_ox.append([])
-
-    maes_no2.append([])
-    rmses_no2.append([])
-    mapes_no2.append([])
-
-    maes_o3.append([])
-    rmses_o3.append([])
-    mapes_o3.append([])
+  print "\nFor OX sensors....."
+  coeffs_ox, maes_ox, rmses_ox, mapes_ox = regress_sensor_type(
+        ox_x, ox_y, training_set_ratio, runs)
   
-    for i in xrange(runs):
-      sys.stdout.write("\rEpoch ............ %d" % (i+1))
+  # mean coefficients should have the shape (N+1) * m
+  mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1)).T
+  mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1)).T
 
-      coeffs, metrics = regress_once(no2_x[j], no2_y, training_set_ratio)
-      coeffs_no2[j].append(coeffs)
-      maes_no2[j].append(metrics[0])
-      rmses_no2[j].append(metrics[1])
-      mapes_no2[j].append(metrics[2])
+  # plot violins for error metrics
+  plot_error_violins(maes_no2, name='MAE',
+        full_name='Mean Absolute Error', sens_type='NO_2');
+  plot_error_violins(rmses_no2, name='RMSE',
+        full_name='Root Mean Square Error', sens_type='NO_2');
+  plot_error_violins(mapes_no2, name='MAPE',
+        full_name='Mean Absolute Percentage Error', sens_type='NO_2');
 
-      coeffs, metrics = regress_once(ox_x[j], ox_y, training_set_ratio)
-      coeffs_ox[j].append(coeffs)
-      maes_o3[j].append(metrics[0])
-      rmses_o3[j].append(metrics[1])
-      mapes_o3[j].append(metrics[2])
-
-    print "\n"
-
-    mean_no2_coeffs.append(np.mean(coeffs_no2[j], axis=0))
-    mean_ox_coeffs.append(np.mean(coeffs_ox[j], axis=0))
-
-    tmp = np.concatenate((no2_x[j], np.ones([np.shape(no2_x[j])[0], 1])), axis=1)
-    predict_no2 = np.dot(tmp, mean_no2_coeffs[j].T)
-    no2_y_pred.append(predict_no2.tolist())
-
-    tmp = np.concatenate((ox_x[j], np.ones([np.shape(ox_x[j])[0], 1])), axis=1)
-    predict_o3 = np.dot(tmp, mean_ox_coeffs[j].T) - predict_no2
-    o3_y_pred.append(predict_o3.tolist())
-
-    # visualize predictions
-    if temps_present:
-      plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
-                         predict_o3, j, comp_witht=temps_present, temps=temp[j])
-    else:
-      plot_ts_prediction(epochs, no2_y, predict_no2, o3_y, predict_o3, j)
-    
-    print "Sensor %d DONE" % (j+1)
-
-  mean_no2_coeffs = np.array(mean_no2_coeffs).T
-  mean_ox_coeffs = np.array(mean_ox_coeffs).T
-
-  # plot comparison of predicted values
-  no2_y_pred = np.round(np.array(no2_y_pred).T, decimals=6)
-  o3_y_pred = np.round(np.array(o3_y_pred).T, decimals=6)
-
-  # TODO: Make legend labels more generic
-  if len(no2_x) > 1:
-    fig, ax = plotting.ts_plot(epochs, no2_y_pred,
-          title = r'\textbf{Comparison of } $ NO_2 $ \textbf{ predictions from SATVAM sensors}',
-          ylabel= r'\textit{Concentration of } $ NO_2 $  (ppb)',
-          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)],
-          ids=range(1, len(no2_x)+1))
-    
-    txt = get_corr_txt(no2_y_pred[:, 0], no2_y_pred[:, 1])
-    ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    no2_figs.append(fig)
-    no2_fignames.append('no2-predicted-comp')
-
-    # TODO: Make legend labels more generic
-    fig, ax = plotting.ts_plot(epochs, o3_y_pred,
-          title = r'\textbf{Comparison of } $ O_3 $ \textbf{ predictions from SATVAM sensors}',
-          ylabel= r'\textit{Concentration of } $ O_3 $  (ppb)',
-          leg_labels=[("Sensor %d" % x) for x in range(1, len(no2_x)+1)],
-          ids=range(1, len(no2_x)+1))
-    
-    txt = get_corr_txt(o3_y_pred[:, 0], o3_y_pred[:, 1])
-    ax.annotate(txt, xy=(0.7, 0.75), xycoords='axes fraction')
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    o3_figs.append(fig)
-    o3_fignames.append('o3-predicted-comp')
-
-
-  # compare violins of each NO2 sensor
-  coeffs_no2 = np.array(coeffs_no2)
-  coeffs_ox = np.array(coeffs_ox)
-
-  for i in xrange(coeffs_no2.shape[2]):
-    fig, ax = plotting.plot_violin(coeffs_no2[:, :, i].T,
-        title=r"\textbf{Coefficient of %s for } $ NO_2 $" % coeffs_no2_names[i],
-        ylabel=r"\textit{Coefficient of %s}" % coeffs_no2_names[i],
-        xlabel=r"\textbf{Sensors}")
-
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    no2_figs.append(fig)
-    no2_fignames.append('no2-coeff%d-violin' % (i + 1))
-
-  for i in xrange(coeffs_ox.shape[2]):
-    fig, ax = plotting.plot_violin(coeffs_ox[:, :, i].T,
-        title=r"\textbf{Coefficient of %s for } $ O_3 $" % coeffs_ox_names[i],
-        ylabel=r"\textit{Coefficient of %s}" % coeffs_ox_names[i],
-        xlabel=r"\textbf{Sensors}")
-
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    o3_figs.append(fig)
-    o3_fignames.append('o3-coeff%d-violin' % (i + 1))
-
-  # compare error violins
-  # -------------------------------------------------------------------------
-
-  # plot time series of sensors predicted using all different coefficients
-  for (j, no2) in enumerate(no2_x):
-    
-    leg_labels = [('Trained on Sensor %d (Set %d)' % (i, i)) for i in range(1,
-          np.shape(mean_no2_coeffs)[1] + 1)]
-    leg_labels.insert(0, 'Reference conc')
-    ids = range(0, mean_no2_coeffs.shape[1]+1)
-
-    no2 = np.concatenate((no2, np.ones([np.shape(no2)[0], 1])), axis=1)
-    t_series = np.dot(no2, mean_no2_coeffs)
-    t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]),
-                              t_series), axis=1)
-    t_series = np.round(t_series, decimals=CONF_DECIMALS)
-
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{Comparison of predicted values for }'
-              + r'$ NO_2 $ \textbf{ (Sensor %d)}' % (j + 1),
-        ylabel = r'Concentration (ppb)',
-        leg_labels=leg_labels, ids=ids)
-
-    for i in range(1, np.size(t_series, axis=1)):
-      text = get_corr_txt(t_series[:, 0],
-          t_series[:, i], add_title='(Set %d)' % i)
-
-      x = i / 5.0
-      ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
-
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    no2_figs.append(fig)
-    no2_fignames.append('no2-coeffs-predict-sens%d' % (j + 1))
-
-  for (j, ox) in enumerate(ox_x):
-    
-    leg_labels = [('Trained on Sensor %d (set %d)' % (i, i)) for i in range(1,
-          np.shape(mean_ox_coeffs)[1] + 1)]
-    leg_labels.insert(0, 'Reference conc')
-    ids = range(0, mean_ox_coeffs.shape[1]+1)
-
-    ox = np.concatenate((ox, np.ones([np.shape(ox)[0], 1])), axis=1)
-    t_series = np.concatenate((np.reshape(ox_y, [np.size(ox_y), 1]),
-        np.dot(ox, mean_ox_coeffs)), axis=1)
-    t_series = np.round(t_series, decimals=CONF_DECIMALS)
-
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{Comparison of predicted values for }'
-              + r'$ OX $ \textbf{ (Sensor %d)}' % (j + 1),
-        ylabel = r'Concentration (ppb)',
-        leg_labels=leg_labels, ids=ids)
-
-    for i in range(1, np.size(t_series, axis=1)):
-      text = get_corr_txt(t_series[:, 0],
-        t_series[:, i], add_title='(Set %d)' % i)
-
-      x = i / 5.0
-      ax.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
-
-    #txt = watermark(ax, loc_label, '')
-    #ax.annotate(txt, xy=(0.6, 0.3), xycoords='axes fraction')
-
-    o3_figs.append(fig)
-    o3_fignames.append('ox-coeffs-predict-sens%d' % (j + 1))
-
-  # ----------------------------------------------------------------------------
-  no2_x_agg = no2_x[0]
-  ox_x_agg = ox_x[0]
-  no2_y_agg = np.tile(no2_y, len(no2_x))
-  ox_y_agg = np.tile(ox_y, len(ox_x))
-
-  for i in range(1, len(no2_x)):
-    no2_x_agg = np.concatenate((no2_x_agg, no2_x[i]), axis=0)
-    ox_x_agg = np.concatenate((ox_x_agg, ox_x[i]), axis=0)
-  
-  coeffs_no2 = regress_once(no2_x_agg, no2_y_agg)
-  print coeffs_no2
-  coeffs_ox = regress_once(ox_x_agg, ox_y_agg)
-  print coeffs_ox
-
-  for i in xrange(len(no2_x)):
-    tmp = np.concatenate((no2_x[i], np.ones([no2_x[i].shape[0], 1])), axis=1)
-    predict_no2 = np.dot(tmp, np.reshape(coeffs_no2,
-                                         [np.size(coeffs_no2), 1]))
-    tmp = np.concatenate((ox_x[i], np.ones([ox_x[i].shape[0], 1])), axis=1)
-    predict_o3 = np.dot(tmp, np.reshape(coeffs_ox,
-                                   [np.size(coeffs_ox), 1])) - predict_no2
-
-    t_series = np.concatenate((np.reshape(no2_y, [np.size(no2_y), 1]), predict_no2), axis=1)
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{Prediction for $ NO_2 $ after training using mixed dataset}'
-              + r'\textbf{ (Sensor %d)}' % (i + 1),
-        ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference', 'Sensor %d' % (i + 1)],
-        ids=[0, i+1])
-    
-    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
-
-    ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
-    no2_figs.append(fig)
-    no2_fignames.append('no2-mixed-pred-sens%d' % (i + 1))
-
-    t_series = np.concatenate((np.reshape(o3_y, [np.size(o3_y), 1]), predict_o3), axis=1)
-    fig, ax = plotting.ts_plot(epochs, t_series,
-        title = r'\textbf{Prediction for $ O_3 $ after training using mixed dataset}'
-              + r'\textbf{ (Sensor %d)}' % (i + 1),
-        ylabel = r'Concentration (ppb)',
-        leg_labels=['Reference', 'Sensor %d' % (i + 1)],
-        ids=[0, i+1])
-    
-    text = get_corr_txt(t_series[:, 0], t_series[:, 1])
-
-    ax.annotate(text, xy = (0.75, 0.75), xycoords='axes fraction')
-    o3_figs.append(fig)
-    o3_fignames.append('o3-mixed-pred-sens%d' % (i + 1))
+  plot_error_violins(maes_ox, name='MAE',
+        full_name='Mean Absolute Error', sens_type='O_X');
+  plot_error_violins(rmses_ox, name='RMSE',
+        full_name='Root Mean Square Error', sens_type='O_X');
+  plot_error_violins(mapes_ox, name='MAPE',
+        full_name='Mean Absolute Percentage Error', sens_type='O_X');
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 

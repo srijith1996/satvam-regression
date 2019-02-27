@@ -264,7 +264,8 @@ def compare_ts_plot(epochs, y1, y2, title='', ylabel='',
 
   return fig, ax
 # ------------------------------------------------------------------------------
-def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
+def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto',
+                x_tick_labels=[]):
 
   pos = []
   if X.ndim == 1:
@@ -316,13 +317,18 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto'):
              showmeans=True, showextrema=True, showmedians=True)
 
   autolabel()
-  #x_ticks_labels = ['Bandwidth (Mbits/sec)']
+  #x_tick_labels = ['Bandwidth (Mbits/sec)']
   parts['cmeans'].set_edgecolor('darkred')
   parts['cmedians'].set_edgecolor('darkgreen')
 
   ax.set_xticks(pos)
-  ax.set_xticklabels([(x + 1)/2 for x in pos])
-  #ax.set_xticklabels(x_ticks_labels, rotation='0', fontsize=24)
+  
+  # set ticklabels
+  if len(x_tick_labels) == 0:
+    ax.set_xticklabels([(x + 1)/2 for x in pos])
+  else:
+    ax.set_xticklabels(x_tick_labels, rotation='0', fontsize=13)
+
   if X.ndim > 1:
     ax.set_xlim([0,2*np.size(X, 1)])
     legend = ax.legend(loc='upper right', shadow=True, fontsize='small')
