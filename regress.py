@@ -2,6 +2,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import normalize
+from sklearn.feature_selection import f_regression, mutual_info_regression
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.patches as mpatches
@@ -26,7 +28,7 @@ no2_fignames = []
 o3_fignames = []
 # ==============================================================================
 # Statistics routines
-def clean_data(X, sigma_mult):
+def clean_data(X, sigma_mult, clean_ref=False):
   '''
      Clean data beyond sigma_mult standard deviations from the mean
      in each column of X
@@ -53,13 +55,45 @@ def clean_data(X, sigma_mult):
   ranges = [(mu - sigma_mult * sigma).tolist(),
             (mu + sigma_mult * sigma).tolist()]
 
-  for i in xrange(1, X.values.shape[1]):
-    X = X[X.iloc[:,[i]].applymap(lambda x: (x > ranges[0][i]
-         and x < ranges[1][i])).all(1)]
+  if clean_ref:
+    print "Cleaning reference monitor data as well!"
+    for i in xrange(1, X.values.shape[1]):
+      X = X[X.iloc[:,[i]].applymap(lambda x: (x > ranges[0][i]
+          and x < ranges[1][i])).all(1)]
+  else:
+    for i in xrange(3, X.values.shape[1]):
+      X = X[X.iloc[:,[i]].applymap(lambda x: (x > ranges[0][i]
+          and x < ranges[1][i])).all(1)]
 
   print "%d entries dropped" % (sizex - len(X))
 
   return X
+# ------------------------------------------------------------------------------
+def window_avg(data_df, window_size):
+  '''
+    Average contiguous chunks of data with size, window_size
+  '''
+  vals = data_df.values
+  avg_vals = []
+
+  for i in xrange(vals.shape[0]):
+    start_t = vals[i, 0]
+
+    # record boundary in j
+    for j in range(1, vals.shape[0] - i):
+      if (vals[i+j, 0] - start_t) >= (window_size * 60):
+        break
+
+    window = np.nanmean(vals[range(i, i+j), 1:], axis=0)
+    avg_vals.append(window.tolist())
+    avg_vals[i].insert(0, start_t)
+    i = i + j
+
+  avg_vals = pd.DataFrame(avg_vals).dropna()
+  avg_vals = avg_vals.values
+
+  print avg_vals
+  return avg_vals
 # ==============================================================================
 # Routines for visualization
 def watermark(ax, loc, add_string):
@@ -374,7 +408,7 @@ def plot_coeff_violins(coeff, names=[], sens_type=''):
 
   for i in xrange(coeff.shape[2]):
     fig, ax = plotting.plot_violin(coeff[:, :, i],
-        title=r"\textbf{Coefficient of %s for } $ NO_2 $" % names[i],
+        title=r"\textbf{Coefficient of %s for } $ %s $" % (names[i], sens_type),
         ylabel=r"\textit{Coefficient of %s}" % names[i],
         xlabel=r"\textit{Trained on Sensor}",
         x_tick_labels=tick_labels)
@@ -427,7 +461,7 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
 
   # train model
   reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
-    
+
   # test model
   if labels is not None:
     labels = labels[perm]
@@ -450,7 +484,7 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
 
   return coeffs, metrics
 # ------------------------------------------------------------------------------
-def regress_sensor_type(X, y, train_ratio, runs):
+def regress_sensor_type(X, y, epochs, train_ratio, runs):
   '''
      Train on all sensors of a certain type and obtain self
      trained and cross trained error measures
@@ -517,27 +551,24 @@ def regress_sensor_type(X, y, train_ratio, runs):
       rmses[j, i, -1] = metrics[1]
       mapes[j, i, -1] = metrics[2]
 
-    print ""
-
-    # visualize predictions
-    #if temps_present:
-    #  plot_ts_prediction(epochs, no2_y, predict_no2, o3_y,
-    #                     predict_o3, j, comp_witht=temps_present, temps=temp[j])
-    #else:
-    #  plot_ts_prediction(epochs, no2_y, predict_no2, o3_y, predict_o3, j)
-    
-    print "Sensor %d DONE" % (j+1)
+    print "\nSensor %d DONE" % (j+1)
 
   return coeffs, maes, rmses, mapes
 
 # ------------------------------------------------------------------------------
 def regress_df(data, temps_present=False, hum_present=False,
-               incl_temps=False, incl_op2t=False,
-               incl_hum=False, incl_op2h=False,
-               clean=3, runs=1000, loc_label='---'):
+               incl_op1=True, incl_op2=False,
+               incl_temps=False, incl_op1t=False, incl_op2t=False,
+               incl_hum=False, incl_op1h=False, incl_op2h=False,
+               incl_op12=False, clean=None, avg=None, runs=1000,
+               loc_label='---'):
 
   # remove outliers
-  data = clean_data(data, clean)
+  if clean is not None:
+    data = clean_data(data, clean)
+
+  if avg is not None:
+    data = window_avg(data, avg)
 
   # remove possible outliers
   #tmp_data = pd.DataFrame(data.iloc[:, 0])
@@ -557,8 +588,14 @@ def regress_df(data, temps_present=False, hum_present=False,
   no2_y_pred = []
   o3_y_pred = []
 
-  coeffs_no2_names = ['op1', 'op2']
-  coeffs_ox_names = ['op1', 'op2']
+  coeffs_no2_names = []
+  coeffs_ox_names = []
+  if incl_op1:
+    coeffs_no2_names.append('op1')
+    coeffs_ox_names.append('op1')
+  if incl_op2:
+    coeffs_no2_names.append('op2')
+    coeffs_ox_names.append('op2')
 
   # column locations for no2, ox and temperature data of the ith sensor
   col_skip = 3
@@ -580,11 +617,11 @@ def regress_df(data, temps_present=False, hum_present=False,
     col_no2 = (lambda i: range((col_skip + 4*i),(col_skip + 4*i + 2)))
     col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
 
-  epochs = data.values[:,0]
+  epochs = data[:,0]
 
   # store x and y values
-  no2_y = data.values[:,1]
-  o3_y = data.values[:,2]
+  no2_y = data[:,1]
+  o3_y = data[:,2]
 
   # convert o3 to ox for regression
   ox_y = o3_y + no2_y
@@ -594,76 +631,147 @@ def regress_df(data, temps_present=False, hum_present=False,
       coeffs_no2_names.append('temp')
       coeffs_ox_names.append('temp')
 
-    if incl_op2t:
-      coeffs_no2_names.append('op2T')
-      coeffs_ox_names.append('op2T')
-
   if hum_present:
     if incl_hum:
       coeffs_no2_names.append('hum')
       coeffs_ox_names.append('hum')
 
+  if temps_present:
+    if incl_op1t:
+      coeffs_no2_names.append('op1T')
+      coeffs_ox_names.append('op1T')
+
+    if incl_op2t:
+      coeffs_no2_names.append('op2T')
+      coeffs_ox_names.append('op2T')
+
+  if hum_present:
+    if incl_op1h:
+      coeffs_no2_names.append('op1h')
+      coeffs_ox_names.append('op1h')
+
     if incl_op2h:
       coeffs_no2_names.append('op2h')
       coeffs_ox_names.append('op2h')
       
+  if incl_op12:
+    coeffs_no2_names.append('op1op2')
+    coeffs_ox_names.append('op1op2')
+      
   coeffs_no2_names.append('constant')
   coeffs_ox_names.append('constant')
     
-  for i in xrange(np.size(data.values, 1)):
-    if col_ox(i)[-1] >= np.size(data.values, 1):
+  for i in xrange(np.size(data, 1)):
+    if col_ox(i)[-1] >= np.size(data, 1):
       break
 
-    tmp_idx_n = col_no2(i)
-    tmp_idx_o = col_ox(i)
+    tmp_idx_n = []
+    tmp_idx_o = []
+    
+    if incl_op1:
+      tmp_idx_n.append(col_no2(i)[0])
+      tmp_idx_o.append(col_ox(i)[0])
+    if incl_op2:
+      tmp_idx_n.append(col_no2(i)[1])
+      tmp_idx_o.append(col_ox(i)[1])
 
     if temps_present:
-      temp.append(data.values[:,col_temp(i)])
+      temp.append(data[:,col_temp(i)])
       if incl_temps:
         tmp_idx_n.append(col_temp(i))
         tmp_idx_o.append(col_temp(i))
 
     if hum_present:
-      hum.append(data.values[:,col_hum(i)])
+      hum.append(data[:,col_hum(i)])
       if incl_hum:
         tmp_idx_n.append(col_hum(i))
         tmp_idx_o.append(col_hum(i))
 
-    no2_x.append(data.values[:,tmp_idx_n])
-    ox_x.append(data.values[:,tmp_idx_o])
+    no2_x.append(data[:,tmp_idx_n])
+    ox_x.append(data[:,tmp_idx_o])
+ 
+    if temps_present and incl_op1t:
+      no2_op1t = np.reshape(data[:, col_no2(i)[0]]
+        * data[:, col_temp(i)], [np.shape(data)[0], 1])
+      ox_op1t = np.reshape(data[:, col_ox(i)[0]]
+        * data[:, col_temp(i)], [np.shape(data)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op1t), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op1t), axis=1)
 
     if temps_present and incl_op2t:
-      no2_op2t = np.reshape(data.values[:, col_no2(i)[1]]
-        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
-      ox_op2t = np.reshape(data.values[:, col_ox(i)[1]]
-        * data.values[:, col_temp(i)], [np.shape(data.values)[0], 1])
+      no2_op2t = np.reshape(data[:, col_no2(i)[1]]
+        * data[:, col_temp(i)], [np.shape(data)[0], 1])
+      ox_op2t = np.reshape(data[:, col_ox(i)[1]]
+        * data[:, col_temp(i)], [np.shape(data)[0], 1])
 
       no2_x[i] = np.concatenate((no2_x[i], no2_op2t), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op2t), axis=1)
 
+    if hum_present and incl_op1h:
+      no2_op1h = np.reshape(data[:, col_no2(i)[0]]
+        * data[:, col_hum(i)], [np.shape(data)[0], 1])
+      ox_op1h = np.reshape(data[:, col_ox(i)[0]]
+        * data[:, col_hum(i)], [np.shape(data)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op1h), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op1h), axis=1)
+
     if hum_present and incl_op2h:
-      no2_op2h = np.reshape(data.values[:, col_no2(i)[1]]
-        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
-      ox_op2h = np.reshape(data.values[:, col_ox(i)[1]]
-        * data.values[:, col_hum(i)], [np.shape(data.values)[0], 1])
+      no2_op2h = np.reshape(data[:, col_no2(i)[1]]
+        * data[:, col_hum(i)], [np.shape(data)[0], 1])
+      ox_op2h = np.reshape(data[:, col_ox(i)[1]]
+        * data[:, col_hum(i)], [np.shape(data)[0], 1])
 
       no2_x[i] = np.concatenate((no2_x[i], no2_op2h), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op2h), axis=1)
 
-  #visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
+    if incl_op12:
+      no2_op12 = np.reshape(data[:, col_no2(i)[0]]
+        * data[:, col_no2(i)[1]], [np.shape(data)[0], 1])
+      ox_op12 = np.reshape(data[:, col_ox(i)[0]]
+        * data[:, col_ox(i)[1]], [np.shape(data)[0], 1])
+
+      no2_x[i] = np.concatenate((no2_x[i], no2_op12), axis=1)
+      ox_x[i] = np.concatenate((ox_x[i], ox_op12), axis=1)
+
+  visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
 
   # process and regress data: multifold
   print "\nFor NO_2 sensors....."
   coeffs_no2, maes_no2, rmses_no2, mapes_no2 = regress_sensor_type(
-        no2_x, no2_y, training_set_ratio, runs)
+        no2_x, no2_y, epochs, training_set_ratio, runs)
 
   print "\nFor OX sensors....."
   coeffs_ox, maes_ox, rmses_ox, mapes_ox = regress_sensor_type(
-        ox_x, ox_y, training_set_ratio, runs)
+        ox_x, ox_y, epochs, training_set_ratio, runs)
   
   # mean coefficients should have the shape (N+1) * m
-  mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1)).T
-  mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1)).T
+  mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1))
+  mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1))
+
+  # find p_vals and chi^2 values of the features
+  #for x in no2_x:
+  #  x = np.concatenate((x, np.ones([np.shape(x)[0], 1])), axis=1)
+  ##  f, p_vals = f_regression(np.dot(x, mean_no2_coeffs.T), no2_y)
+  #  print f, p_vals
+#
+#  for x in ox_x:
+##    x = np.concatenate((x, np.ones([np.shape(x)[0], 1])), axis=1)
+#    f, p_vals = f_regression(np.dot(x, mean_ox_coeffs.T), ox_y)
+#    print f, p_vals
+
+  for x in no2_x:
+    x = normalize(x, axis=0)
+    #mi = mutual_info_regression(x, no2_y)
+    mi = f_regression(x, no2_y)
+    print mi
+
+  for x in ox_x:
+    x = normalize(x, axis=0)
+    #mi = mutual_info_regression(x, ox_y)
+    mi = f_regression(x, ox_y)
+    print mi
 
   # plot violins for error metrics
   plot_error_violins(maes_no2, name='MAE',
@@ -691,9 +799,11 @@ def regress_df(data, temps_present=False, hum_present=False,
          coeffs_ox.shape[2],
          coeffs_ox.shape[3]])
 
+  print coeffs_ox_names
+  print coeffs_no2_names
   # plot violins for coefficients
-  plot_coeff_violins(coeffs_no2, names=['op1', 'op2', 'const'], sens_type='NO_2')
-  plot_coeff_violins(coeffs_ox, names=['op1', 'op2', 'const'], sens_type='O_3')
+  plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
+  plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 

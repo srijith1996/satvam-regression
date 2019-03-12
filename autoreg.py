@@ -24,10 +24,15 @@ import regress
 #import pdfpublish
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
+
+import alphasense
 # -------------------------------------------------------------------------------
 # Change this field to 'MPCB' or 'MRIU' based on deployment site
-DEPLOY_SITE = 'MPCB'
+DEPLOY_SITE = 'MRIU'
 DEPLOYMENT = 2
+CONF_AVG_WINDOW_SIZE_MIN = 60
+CONF_CLEAN = None
+CONF_RUNS = 200
 
 DEPLOY_SITE = DEPLOY_SITE.upper()
 
@@ -235,9 +240,8 @@ if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   print "Processing EBAM data........"
   
   ebam_df = pd.read_csv(EBAM_FILE, header=EBAM_HEADER_ROW)
+  ebam_df = ebam_df[[EBAM_TS_FIELD_HDR, EBAM_PM25_FIELD_HDR]].dropna()
 
-  ebam_df.dropna()
-  
   # These strings do not exist in the file,
   # This statement gets rid of the "string not float" error
   ebam_df = ebam_df[ebam_df.applymap(lambda x:
@@ -250,7 +254,6 @@ if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   times = ebam_df[EBAM_TS_FIELD_HDR].values
 
   for i in xrange(len(times)):
-    print times[i]
     times[i] = dt.datetime.strptime(times[i],
         EBAM_TS_FORMAT).strftime('%s')
     times[i] = int(times[i])
@@ -378,7 +381,7 @@ for i in xrange(NUM_SENSORS):
   aggregate_list.append(no2_op2[:, i].tolist())
   aggregate_list.append(ox_op1[:, i].tolist())
   aggregate_list.append(ox_op2[:, i].tolist())
-
+# -------------------------------------------------------------------------------
 target_df = pd.DataFrame(aggregate_list).transpose()
 target_df = target_df.dropna()
 print "Data set size (after dropna()): " + str(len(target_df.index))
@@ -391,10 +394,15 @@ if DEPLOYMENT == 1:
   t_present = False
   h_present = False
 
+#alphasense.alphasense_compute(target_df, t_incl=True, h_incl=True)
+
 no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
-        temps_present=t_present, incl_temps=True, incl_op2t=True,
-        hum_present=h_present, incl_hum=False, incl_op2h=False, clean=3,
-        runs=2000, loc_label=DEPLOY_SITE)
+        temps_present=t_present, incl_op1=True, incl_op2=True, 
+        incl_temps=False, incl_op1t=False, incl_op2t=False,
+        hum_present=h_present, incl_hum=False, incl_op1h=False, incl_op2h=False,
+        incl_op12=False, clean=CONF_CLEAN, avg=CONF_AVG_WINDOW_SIZE_MIN,
+        runs=CONF_RUNS, loc_label=DEPLOY_SITE)
+
 #pages = pdfpublish.generate_text()
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')
