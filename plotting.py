@@ -348,6 +348,22 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto',
 
   return fig, ax
 # ------------------------------------------------------------------------------
+def plot_stem(x, y, title='', xlabel='', ylabel=''):
+  
+  fig = plt.figure()
+  ax = fig.add_subplot('111')
+
+  set_plot_labels(ax, title, xlabel, ylabel)
+
+  plt.grid()
+  ax.yaxis.grid(b=True, which='major', color='g', linestyle='-', alpha=0.2)
+  ax.xaxis.grid(b=True, which='major', color='g', linestyle='-', alpha=0.2)
+
+  ax.stem(x, y, alpha=0.8, linestyle='-')
+
+  return fig, ax
+  
+# ------------------------------------------------------------------------------
 def plot_hist(ax, v, bins=20, title='', ids=None):
   '''
     Plot the histogram of samples in v
@@ -383,7 +399,7 @@ def inset_hist_fig(fig, outer_ax, v, size, loc, ids=None):
   in_axes = inset_axes(outer_ax, width=size[0],
           height=size[1], loc=loc)
 
-  in_axes.patch.set_alpha(0.6)
+  #in_axes.patch.set_alpha(0.6)
 
   plot_hist(in_axes, v, bins=200, title=r'Distribution', ids=ids)
 

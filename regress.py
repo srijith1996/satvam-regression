@@ -1,7 +1,10 @@
 # ------------------------------------------------------------------------------
+import gc
 import pandas as pd
 import numpy as np
+import scipy.linalg as la
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import normalize
 from sklearn.feature_selection import f_regression, mutual_info_regression
 import matplotlib.pyplot as plt
@@ -20,6 +23,7 @@ import plotting
 import stats
 # ------------------------------------------------------------------------------
 CONF_DECIMALS = 6
+CONF_REG = 'rfr'
 # ------------------------------------------------------------------------------
 # list of all figures plotted
 no2_figs = []
@@ -92,7 +96,6 @@ def window_avg(data_df, window_size):
   avg_vals = pd.DataFrame(avg_vals).dropna()
   avg_vals = avg_vals.values
 
-  print avg_vals
   return avg_vals
 # ==============================================================================
 # Routines for visualization
@@ -137,7 +140,7 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          ylabel=r'$ NO_2 $\textit{ concentration (ppb)}', ylim=[0, 100],
          leg_labels=[r'$ NO_2 $ conc (ppb)'], ids=[0])
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_y, ['25%', '25%'], 1, ids=[0])
+  #fig = plotting.inset_hist_fig(fig, ax, no2_y, ['25%', '25%'], 1, ids=[0])
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -149,7 +152,7 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          ylabel=r'$ O_3 $\textit{concentration (ppb)}', ylim=[0, 100],
          leg_labels=['$ O_3 $ conc (ppb)'], ids=[0])
 
-  fig = plotting.inset_hist_fig(fig, ax, o3_y, ['25%', '25%'], 1, ids=[0])
+  #fig = plotting.inset_hist_fig(fig, ax, o3_y, ['25%', '25%'], 1, ids=[0])
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -174,8 +177,8 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)],
          ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals,
-                                ['25%', '25%'], 1, ids=ids)
+  #fig = plotting.inset_hist_fig(fig, ax, no2_op1_vals,
+  #                              ['25%', '25%'], 1, ids=ids)
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -188,8 +191,8 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(no2_x)+1)],
          ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals,
-                                 ['25%', '25%'], 1, ids=ids)
+  #fig = plotting.inset_hist_fig(fig, ax, no2_op2_vals,
+  #                               ['25%', '25%'], 1, ids=ids)
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -206,8 +209,8 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)],
          ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals,
-                                ['25%', '25%'], 1, ids=ids)
+  #fig = plotting.inset_hist_fig(fig, ax, ox_op1_vals,
+  #                              ['25%', '25%'], 1, ids=ids)
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -220,8 +223,8 @@ def visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y):
          leg_labels=[('Sensor %d' % x) for x in range(1, len(ox_x)+1)],
          ids=ids)
 
-  fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals,
-                                ['25%', '25%'], 1, ids=ids)
+  #fig = plotting.inset_hist_fig(fig, ax, ox_op2_vals,
+  #                              ['25%', '25%'], 1, ids=ids)
   #txt = watermark(ax, loc_label, '')
   #ax.annotate(txt, xy = (0.6, 0.3), xycoords='axes fraction')
 
@@ -471,6 +474,34 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
 
   metrics = []
   pred = reg.predict(X_test)
+  
+  # plot of mean errors vs reference conc.
+  #err = np.abs(y_test - pred)
+  #num_bins = 40
+  #pad = 5
+  #bin_edges = np.arange(0, num_bins + 1) * np.max(y_test)/num_bins
+  #mean_err = np.zeros([num_bins, ])
+  #mean = np.zeros([num_bins, ])
+  #lens = np.zeros([num_bins, ])
+
+  #for i in xrange(len(bin_edges)-1):
+  #  mean_err[i] = np.mean(err[[(val >= bin_edges[i]
+  #                          and val < bin_edges[i+1]) for val in y_test]])
+  #  mean[i] = np.mean(y_test[[(val >= bin_edges[i]
+  #                          and val < bin_edges[i+1]) for val in y_test]])
+  #  lens[i] = np.size(y_test[[(val >= bin_edges[i]
+  #                          and val < bin_edges[i+1]) for val in y_test]])
+
+  #fig, ax = plotting.plot_stem(mean, mean_err,
+  #            title=r'\textbf{Mean errors of concentration ranges}',
+  #            xlabel=r'\textit{Reference concentration (p.p.b.)}',
+  #            ylabel=r'\textit{Mean Absolute error (p.p.b.)}')
+  
+  #for i in xrange(num_bins):
+  #  ax.annotate('n = %d' % lens[i], xy=(mean[i], mean_err[i] + pad), rotation = 80)
+
+  #plt.show()
+  
   metrics.append(stats.mae(y_test, pred))
   metrics.append(stats.rmse(y_test, pred))
   metrics.append(stats.mape(y_test, pred))
@@ -483,6 +514,112 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
   coeffs.append(reg.intercept_)
 
   return coeffs, metrics
+# ------------------------------------------------------------------------------
+def tls_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
+  '''
+     Perform total least squares regression on the given data-set and
+     return coefficients and error metrics
+    
+     Parameters:
+      X      - Values of X in linear regression
+      y      - Values of y in linear regression
+      labels - For computation of error only values corresponding to
+               non-zero labels will be considered
+      train_size - ratio of the complete data-set used for training
+      intercept - Include intercept in regression
+
+     Return:
+      coeffs - Coefficients of regression
+      metrics - Array of metrics [MAE, RMSE, MAPE]
+   '''
+
+  
+  train_size = int(np.floor(train_size * X.shape[0]))
+
+  perm = np.arange(X.shape[0])
+  perm = np.random.permutation(perm)
+
+  if intercept:
+    X_ = np.vstack((X.T, np.ones(np.shape(X)[0]))).T
+
+  X_ = X[perm, :]
+  y_ = y[perm]
+
+  X_train = X_[:train_size, :]
+  y_train = y_[:train_size]
+  X_test = X_[train_size:, :]
+  y_test = y_[train_size:]
+  n = np.shape(X_)[1]
+
+  del X_, y_
+  gc.collect()
+  # train model
+  # augmented matrix
+  X_train = np.vstack((X_train.T, y_train)).T
+  X_train, X_train, X_train = la.svd(X_train, full_matrices=True)
+
+  Vxy = X_train.T[:n, n:]
+  Vyy = X_train.T[n:, n:]
+
+  coeffs = -Vxy / Vyy
+
+  # test model
+  if labels is not None:
+    labels = labels[perm]
+    labels = labels[train_size:]
+    X_test = X_test[(labels != 0)]
+    y_test = y_test[(labels != 0)]
+
+  metrics = []
+  pred = np.dot(X_test, coeffs)
+  metrics.append(stats.mae(y_test, pred))
+  metrics.append(stats.rmse(y_test, pred))
+  metrics.append(stats.mape(y_test, pred))
+
+  # training model
+  # pred = np.dot(X_train, coeffs)
+  # dev = stats.mae(y_train, pred)
+
+  return coeffs, metrics
+# ------------------------------------------------------------------------------
+def rfr_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
+  
+  train_size = int(np.floor(train_size * X.shape[0]))
+
+  perm = np.arange(X.shape[0])
+  perm = np.random.permutation(perm)
+
+  X_ = X[perm, :]
+  y_ = y[perm]
+
+  X_train = X_[:train_size, :]
+  y_train = y_[:train_size]
+  X_test = X_[train_size:, :]
+  y_test = y_[train_size:]
+
+  # train model
+  reg = RandomForestRegressor(n_estimators=10).fit(X_train, y_train)
+
+  # test model
+  if labels is not None:
+    labels = labels[perm]
+    labels = labels[train_size:]
+    X_test = X_test[(labels != 0)]
+    y_test = y_test[(labels != 0)]
+
+  metrics = []
+  pred = reg.predict(X_test)
+  
+  metrics.append(stats.mae(y_test, pred))
+  metrics.append(stats.rmse(y_test, pred))
+  metrics.append(stats.mape(y_test, pred))
+
+  # training model
+  #pred = reg.predict(X_train)
+  #dev = stats.mae(y_train, pred)
+  print reg.feature_importances_
+
+  return metrics
 # ------------------------------------------------------------------------------
 def regress_sensor_type(X, y, epochs, train_ratio, runs):
   '''
@@ -522,7 +659,13 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
       for k in xrange(len(X)):
 
         # Train on sensor k
-        tmpcoeffs, metrics = regress_once(X[k], y, train_size=train_ratio)
+        if CONF_REG == 'tls':
+          tmpcoeffs, metrics = tls_regress_once(X[k], y, train_size=train_ratio)
+        elif CONF_REG == 'rfr':
+          metrics = rfr_regress_once(X[k], y, train_size=train_ratio)
+          tmpcoeffs = None
+        else:
+          tmpcoeffs, metrics = regress_once(X[k], y, train_size=train_ratio)
         coeffs[j, i, k][:] = tmpcoeffs
         maes[j, i, k] = metrics[0]
         rmses[j, i, k] = metrics[1]
@@ -556,12 +699,11 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
   return coeffs, maes, rmses, mapes
 
 # ------------------------------------------------------------------------------
-def regress_df(data, temps_present=False, hum_present=False,
-               incl_op1=True, incl_op2=False,
-               incl_temps=False, incl_op1t=False, incl_op2t=False,
-               incl_hum=False, incl_op1h=False, incl_op2h=False,
-               incl_op12=False, clean=None, avg=None, runs=1000,
-               loc_label='---'):
+def preproc(data, temps_present, hum_present, incl_op1, incl_op2,
+            incl_temps, incl_op1t, incl_op2t, incl_hum, incl_op1h, incl_op2h,
+            incl_op12, incl_cross_terms, clean, avg, runs, loc_label,
+            training_set_ratio = 0.7):
+
 
   # remove outliers
   if clean is not None:
@@ -573,8 +715,6 @@ def regress_df(data, temps_present=False, hum_present=False,
   # remove possible outliers
   #tmp_data = pd.DataFrame(data.iloc[:, 0])
   #data = data[tmp_data.applymap(lambda x: x < 200).all(1)]
-
-  training_set_ratio = 0.7
 
   train_size = int(np.floor(training_set_ratio * data.shape[0]))
   print "Training set size: \t", train_size
@@ -591,11 +731,11 @@ def regress_df(data, temps_present=False, hum_present=False,
   coeffs_no2_names = []
   coeffs_ox_names = []
   if incl_op1:
-    coeffs_no2_names.append('op1')
-    coeffs_ox_names.append('op1')
+    coeffs_no2_names.append('no2op1')
+    coeffs_ox_names.append('oxop1')
   if incl_op2:
-    coeffs_no2_names.append('op2')
-    coeffs_ox_names.append('op2')
+    coeffs_no2_names.append('no2op2')
+    coeffs_ox_names.append('oxop2')
 
   # column locations for no2, ox and temperature data of the ith sensor
   col_skip = 3
@@ -626,6 +766,12 @@ def regress_df(data, temps_present=False, hum_present=False,
   # convert o3 to ox for regression
   ox_y = o3_y + no2_y
 
+  if incl_cross_terms:
+    coeffs_no2_names.append('oxop1')
+    coeffs_no2_names.append('oxop2')
+    coeffs_ox_names.append('no2op1')
+    coeffs_ox_names.append('no2op2')
+
   if temps_present:
     if incl_temps:
       coeffs_no2_names.append('temp')
@@ -638,25 +784,25 @@ def regress_df(data, temps_present=False, hum_present=False,
 
   if temps_present:
     if incl_op1t:
-      coeffs_no2_names.append('op1T')
-      coeffs_ox_names.append('op1T')
+      coeffs_no2_names.append('no2op1T')
+      coeffs_ox_names.append('oxop1T')
 
     if incl_op2t:
-      coeffs_no2_names.append('op2T')
-      coeffs_ox_names.append('op2T')
+      coeffs_no2_names.append('no2op2T')
+      coeffs_ox_names.append('oxop2T')
 
   if hum_present:
     if incl_op1h:
-      coeffs_no2_names.append('op1h')
-      coeffs_ox_names.append('op1h')
+      coeffs_no2_names.append('no2op1h')
+      coeffs_ox_names.append('oxop1h')
 
     if incl_op2h:
-      coeffs_no2_names.append('op2h')
-      coeffs_ox_names.append('op2h')
+      coeffs_no2_names.append('no2op2h')
+      coeffs_ox_names.append('oxop2h')
       
   if incl_op12:
-    coeffs_no2_names.append('op1op2')
-    coeffs_ox_names.append('op1op2')
+    coeffs_no2_names.append('no2op1no2op2')
+    coeffs_ox_names.append('oxop1oxop2')
       
   coeffs_no2_names.append('constant')
   coeffs_ox_names.append('constant')
@@ -674,6 +820,10 @@ def regress_df(data, temps_present=False, hum_present=False,
     if incl_op2:
       tmp_idx_n.append(col_no2(i)[1])
       tmp_idx_o.append(col_ox(i)[1])
+
+    if incl_cross_terms:
+      tmp_idx_n = np.concatenate((tmp_idx_n, col_ox(i)), axis=0).tolist()
+      tmp_idx_o = np.concatenate((tmp_idx_o, col_no2(i)), axis=0).tolist()
 
     if temps_present:
       temp.append(data[:,col_temp(i)])
@@ -735,7 +885,34 @@ def regress_df(data, temps_present=False, hum_present=False,
       no2_x[i] = np.concatenate((no2_x[i], no2_op12), axis=1)
       ox_x[i] = np.concatenate((ox_x[i], ox_op12), axis=1)
 
-  visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
+  #visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
+
+  return epochs, no2_x, no2_y, ox_x, ox_y, coeffs_no2_names, coeffs_ox_names
+# ------------------------------------------------------------------------------
+def regress_df(data, temps_present=False, hum_present=False,
+               incl_op1=True, incl_op2=False,
+               incl_temps=False, incl_op1t=False, incl_op2t=False,
+               incl_hum=False, incl_op1h=False, incl_op2h=False,
+               incl_op12=False, incl_cross_terms=False, clean=None,
+               avg=None, runs=1000, loc_label='---'):
+
+  '''
+    Regress the given dataframe with values for sensor features and
+    features like temperature, humidity, etc.  This function also manages
+    plotting the raw data and information obtained from it. Feature selection
+    is left to the calling program, and can be done by configuring the
+    switches in the args
+  '''
+
+  training_set_ratio = 0.7
+  epochs, no2_x, no2_y, ox_x, ox_y, coeffs_no2_names, coeffs_ox_names = preproc(
+                        data, temps_present, hum_present,
+                        incl_op1, incl_op2, incl_temps, incl_op1t,
+                        incl_op2t, incl_hum, incl_op1h, incl_op2h,
+                        incl_op12, incl_cross_terms, clean, avg,
+                        runs, loc_label, training_set_ratio)
+
+  del data
 
   # process and regress data: multifold
   print "\nFor NO_2 sensors....."
@@ -799,11 +976,12 @@ def regress_df(data, temps_present=False, hum_present=False,
          coeffs_ox.shape[2],
          coeffs_ox.shape[3]])
 
-  print coeffs_ox_names
   print coeffs_no2_names
+  print coeffs_ox_names
   # plot violins for coefficients
-  plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
-  plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
+
+  #plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
+  #plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
 
   return no2_figs, no2_fignames, o3_figs, o3_fignames
 

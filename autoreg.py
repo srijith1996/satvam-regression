@@ -14,6 +14,7 @@
 
 '''
 # -------------------------------------------------------------------------------
+import gc
 import pandas as pd
 import numpy as np
 import sys, os
@@ -26,13 +27,16 @@ from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
 
 import alphasense
+import plotting
 # -------------------------------------------------------------------------------
 # Change this field to 'MPCB' or 'MRIU' based on deployment site
+PARSE_TEMP_REF = True
 DEPLOY_SITE = 'MRIU'
 DEPLOYMENT = 2
-CONF_AVG_WINDOW_SIZE_MIN = 60
-CONF_CLEAN = None
-CONF_RUNS = 200
+CONF_AVG_WINDOW_SIZE_MIN = 1
+CONF_CLEAN = 3
+CONF_RUNS = 10
+CONF_TEMP_HUM_FILE = 'ref'            # either 'ref' or 'satvam'
 
 DEPLOY_SITE = DEPLOY_SITE.upper()
 
@@ -65,7 +69,17 @@ if DEPLOY_SITE == 'MRIU':
 
   if DEPLOYMENT > 1:
     EBAM_FILE = sys.argv[2]
-    SENSOR_FILE_LIST = sys.argv[3:-1]
+    if CONF_TEMP_HUM_FILE == 'ref':
+      REF_TH_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+      REF_TH_DELIM = r'\s+'
+      REF_TH_COL_DATE = 0
+      REF_TH_COL_TIME = 1
+      REF_TH_COL_TEMP = 6
+      REF_TH_COL_HUM = 3
+      TEMP_HUM_FILE = sys.argv[3]
+      SENSOR_FILE_LIST = sys.argv[4:-1]
+    else:
+      SENSOR_FILE_LIST = sys.argv[3:-1]
   else:
     SENSOR_FILE_LIST = sys.argv[2:-1]
 
@@ -87,6 +101,7 @@ if DEPLOY_SITE == 'MRIU':
   EBAM_TS_FIELD_HDR = 'Time'
   EBAM_PM25_FIELD_HDR = 'ConcRT(mg/m3)'
 
+
 elif DEPLOY_SITE == 'MPCB':
 
   # input arg files
@@ -106,6 +121,7 @@ elif DEPLOY_SITE == 'MPCB':
 
   SENSOR_FILE_LIST = sys.argv[2:-1]
 
+
 OUT_FILE_PREFIX = sys.argv[-1]
 DIR_PREFIX = sys.argv[-1] + '/'
 
@@ -116,6 +132,15 @@ except:
   os.makedirs(DIR_PREFIX)
 
 NUM_SENSORS = len(SENSOR_FILE_LIST)
+# -------------------------------------------------------------------------------
+def is_number(s):
+  try:
+    float(s)
+    return True
+  except ValueError:
+    pass
+
+  return False 
 # -------------------------------------------------------------------------------
 # ---------------- PRE-PROCESS SATVAM SENSOR DATA -------------------------------
 # -------------------------------------------------------------------------------
@@ -269,6 +294,39 @@ if DEPLOY_SITE == 'MRIU' and DEPLOYMENT != 1:
   #print min_time, max_time
   
   print "DONE"
+
+# -------------------------------------------------------------------------------
+# ----------------- PRE-PROCESS Reference T/RH file -----------------------------
+# -------------------------------------------------------------------------------
+if DEPLOYMENT == 2 and DEPLOY_SITE == 'MRIU' and CONF_TEMP_HUM_FILE == 'ref':
+  print "Processing Vaisala reference data........"
+  
+  refth_df = pd.read_csv(TEMP_HUM_FILE, sep=REF_TH_DELIM, header=None)
+  refth_df = refth_df[[REF_TH_COL_DATE, REF_TH_COL_TIME,
+                       REF_TH_COL_TEMP, REF_TH_COL_HUM]].dropna()
+
+  refth_df = refth_df[refth_df.applymap(lambda x: (x != "'C")).all(1)].dropna()
+
+  print "Interpreting time stamps...."
+  dates = refth_df[REF_TH_COL_DATE].values
+  times = refth_df[REF_TH_COL_TIME].values
+
+  for i in xrange(len(times)):
+
+    times[i] = dates[i] + ' ' + times[i]
+    times[i] = dt.datetime.strptime(times[i], REF_TH_TIME_FORMAT).strftime('%s')
+    times[i] = int(times[i])
+      
+    # change resolution to minutes
+    times[i] -= times[i] % 60
+  
+  print "Vaisala Reference has %d points" % len(refth_df.index)
+  refth_df = refth_df.drop(columns=[REF_TH_COL_DATE])
+  
+  min_time = min([times[0], min_time])
+  max_time = max([times[-1], max_time])
+  
+  print "DONE"
 # -------------------------------------------------------------------------------
 # generate the time vector
 time_vec = np.arange(min_time, max_time+60, 60)
@@ -281,7 +339,7 @@ no2_op2 = np.empty([len(time_vec), NUM_SENSORS])
 ox_op1 = np.empty([len(time_vec), NUM_SENSORS])
 ox_op2 = np.empty([len(time_vec), NUM_SENSORS])
 
-no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:]
+no2_op1[:] = no2_op2[:] = ox_op1[:] = ox_op2[:] = np.nan
 
 if DEPLOYMENT != 1:
   temp = np.empty([len(time_vec), NUM_SENSORS])
@@ -291,6 +349,13 @@ if DEPLOYMENT != 1:
   pm10 = np.empty([len(time_vec), NUM_SENSORS])
 
   pm1[:] = pm25[:] = pm10[:] = temp[:] = np.nan
+
+#  a = np.empty([len(time_vec), NUM_SENSORS + 2])
+#  b = np.empty([len(time_vec), NUM_SENSORS + 2])
+#  a[:] = b[:] = np.nan
+
+#a[:, 0] = time_vec
+#b[:, 0] = time_vec
 
 print "Time-stamp aligning SATVAM sensor values...."
 for i in xrange(NUM_SENSORS):
@@ -304,6 +369,7 @@ for i in xrange(NUM_SENSORS):
   sens_oxop2 = sens_dfs[i][OXOP2_FIELD_HDR].values
 
   if DEPLOYMENT != 1:
+    #if CONF_TEMP_HUM_FILE != 'ref':
     sens_temp = sens_dfs[i][TEMP_FIELD_HDR].values
     sens_hum = sens_dfs[i][HUM_FIELD_HDR].values
     sens_pm1 = sens_dfs[i][PM1_FIELD_HDR].values
@@ -320,14 +386,68 @@ for i in xrange(NUM_SENSORS):
     ox_op2[ts_index, i] = sens_oxop2[j]
 
     if DEPLOYMENT != 1:
-      temp[ts_index, i] = sens_temp[j]
-      hum[ts_index, i] = sens_hum[j]
+      if DEPLOY_SITE == 'MRIU' and CONF_TEMP_HUM_FILE != 'ref':
+        temp[ts_index, i] = sens_temp[j]
+        hum[ts_index, i] = sens_hum[j]
+#      a[ts_index, i+1] = sens_temp[j]
+#      b[ts_index, i+1] = sens_hum[j]
       pm1[ts_index, i] = sens_pm1[j]
       pm25[ts_index, i] = sens_pm25[j]
       pm10[ts_index, i] = sens_pm10[j]
 
 #print no2_op1
 print "DONE"
+# -------------------------------------------------------------------------------
+if DEPLOYMENT == 2 and DEPLOY_SITE == 'MRIU' and CONF_TEMP_HUM_FILE == 'ref':
+  print "Time-stamp aligning Reference T/RH values...."
+
+  refth_ts = refth_df[REF_TH_COL_TIME].values
+  refth_temp = refth_df[REF_TH_COL_TEMP].values
+  refth_hum = refth_df[REF_TH_COL_HUM].values
+
+  for j in xrange(len(refth_ts)):
+    ts_index = index_ts(refth_ts[j])
+#    a[ts_index, NUM_SENSORS + 1] = refth_temp[j]
+#    b[ts_index, NUM_SENSORS + 1] = refth_hum[j]
+    for i in xrange(NUM_SENSORS):
+      temp[ts_index, i] = refth_temp[j]
+      hum[ts_index, i] = refth_hum[j]
+
+  print "DONE"
+
+# plot temperature and humidity comparison
+#a = a[(a > 0).all(axis=1)]
+#a = a[~np.isnan(a).any(axis=1)]
+#
+#b = b[(b > 0).all(axis=1)]
+#b = b[~np.isnan(b).any(axis=1)]
+#labs = [("Sensor %d" % s) for s in range(1, NUM_SENSORS + 1)]
+#labs.append("Reference")
+#fig1, ax1  = plotting.ts_plot(a[:, 0], a[:, 1:],
+#                       title=r'\textbf{Comparison of temperature readings}',
+#                       ylabel=r'\textit{Temperature }($^{\circ} C $)',
+#                       leg_labels=labs, ids=[5, 7, 9])
+
+#for i in range(2, np.size(a, axis=1)):
+#  text = regress.get_corr_txt(a[:, i].astype(float),
+#      a[:, 1].astype(float), add_title='S%d' % (i-1))
+
+#  x = i / 5.0
+#  ax1.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+
+#fig2, ax2  = plotting.ts_plot(b[:, 0], b[:, 1:],
+#                       title=r'\textbf{Comparison of RH readings}',
+#                       ylabel=r'\textit{RH }\%',
+#                       leg_labels=labs, ids=[5, 7, 9])
+
+#for i in range(2, np.size(b, axis=1)):
+#  text = regress.get_corr_txt(b[:, i].astype(float),
+#      b[:, 1].astype(float), add_title='S%d' % (i-1))
+
+#  x = i / 5.0
+#  ax2.annotate(text, xy = (x, 0.75), xycoords='axes fraction')
+
+#plt.show()
 # -------------------------------------------------------------------------------
 print "Time-stamp aligning ref monitor data...."
 
@@ -388,6 +508,11 @@ print "Data set size (after dropna()): " + str(len(target_df.index))
 # -------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
 
+# free some memory
+#del ref_no2, ref_o3, temp, hum, no2_op1, no2_op2, ox_op1, ox_op2
+#del ref_df, refth_df, sens_dfs, ebam_df, aggregate_list
+#gc.collect()
+
 t_present = True
 h_present = True
 if DEPLOYMENT == 1:
@@ -398,10 +523,10 @@ if DEPLOYMENT == 1:
 
 no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
         temps_present=t_present, incl_op1=True, incl_op2=True, 
-        incl_temps=False, incl_op1t=False, incl_op2t=False,
-        hum_present=h_present, incl_hum=False, incl_op1h=False, incl_op2h=False,
-        incl_op12=False, clean=CONF_CLEAN, avg=CONF_AVG_WINDOW_SIZE_MIN,
-        runs=CONF_RUNS, loc_label=DEPLOY_SITE)
+        incl_temps=True, incl_op1t=False, incl_op2t=False,
+        hum_present=h_present, incl_hum=True, incl_op1h=False, incl_op2h=False,
+        incl_op12=False, incl_cross_terms=True, clean=CONF_CLEAN,
+        avg=CONF_AVG_WINDOW_SIZE_MIN, runs=CONF_RUNS, loc_label=DEPLOY_SITE)
 
 #pages = pdfpublish.generate_text()
 
@@ -418,6 +543,8 @@ for (i, fig) in enumerate(no2_figs):
   plt.close(fig)
 
 pdf.close()
+del no2_figs, no2_names
+gc.collect()
 print 'NO2 PDF ready'
 
 pdf = PdfPages(OUT_FILE_PREFIX + '-o3.pdf')
@@ -433,6 +560,8 @@ for (i, fig) in enumerate(o3_figs):
   plt.close(fig)
 
 pdf.close()
+del o3_figs, o3_names
+gc.collect()
 print 'O3 PDF ready'
 # -------------------------------------------------------------------------------
 # ---------------------- CORRELATE PM2.5 data -----------------------------------
