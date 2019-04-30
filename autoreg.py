@@ -347,6 +347,8 @@ if DEPLOYMENT != 1:
   pm1 = np.empty([len(time_vec), NUM_SENSORS])
   pm25 = np.empty([len(time_vec), NUM_SENSORS])
   pm10 = np.empty([len(time_vec), NUM_SENSORS])
+  sens_t = np.empty([len(time_vec), NUM_SENSORS])
+  sens_h = np.empty([len(time_vec), NUM_SENSORS])
 
   pm1[:] = pm25[:] = pm10[:] = temp[:] = np.nan
 
@@ -386,7 +388,9 @@ for i in xrange(NUM_SENSORS):
     ox_op2[ts_index, i] = sens_oxop2[j]
 
     if DEPLOYMENT != 1:
-      if DEPLOY_SITE == 'MRIU' and CONF_TEMP_HUM_FILE != 'ref':
+      sens_t[ts_index, i] = sens_temp[j]
+      sens_h[ts_index, i] = sens_hum[j]
+      if DEPLOY_SITE != 'MRIU' or CONF_TEMP_HUM_FILE != 'ref':
         temp[ts_index, i] = sens_temp[j]
         hum[ts_index, i] = sens_hum[j]
 #      a[ts_index, i+1] = sens_temp[j]
@@ -501,12 +505,30 @@ for i in xrange(NUM_SENSORS):
   aggregate_list.append(no2_op2[:, i].tolist())
   aggregate_list.append(ox_op1[:, i].tolist())
   aggregate_list.append(ox_op2[:, i].tolist())
+
+aggregate_list = np.array(aggregate_list)
+if DEPLOYMENT != 1:
+  aggregate_list_2 = np.zeros(aggregate_list.shape)
+  aggregate_list_2[:] = aggregate_list
+  for i in xrange(NUM_SENSORS):
+    aggregate_list_2[3 + i * 6, :] = sens_t[:, i]
+    aggregate_list_2[4 + i * 6, :] = sens_h[:, i]
 # -------------------------------------------------------------------------------
 target_df = pd.DataFrame(aggregate_list).transpose()
+target_df = regress.preclean_df(target_df, cols=[1, 2, 5, 6, 7, 8,
+                                                 11, 12, 13, 14])
+target_df = regress.window_avg(target_df, CONF_AVG_WINDOW_SIZE_MIN)
 target_df = target_df.dropna()
-print "Data set size (after dropna()): " + str(len(target_df.index))
+dataset_size = len(target_df.index)
+print "Data set size (after dropna()): " + str(dataset_size)
 # -------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
+
+if DEPLOYMENT != 1:
+  target_df2 = pd.DataFrame(aggregate_list_2).transpose()
+  target_df2 = target_df2.dropna()
+
+target_dfs = [target_df, target_df2]
 
 # free some memory
 #del ref_no2, ref_o3, temp, hum, no2_op1, no2_op2, ox_op1, ox_op2
@@ -523,13 +545,285 @@ if DEPLOYMENT == 1:
 
 no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
         temps_present=t_present, incl_op1=True, incl_op2=True, 
-        incl_temps=True, incl_op1t=False, incl_op2t=False,
-        hum_present=h_present, incl_hum=True, incl_op1h=False, incl_op2h=False,
+        incl_temps=False, incl_op1t=False, incl_op2t=False,
+        hum_present=h_present, incl_hum=False, incl_op1h=False, incl_op2h=False,
         incl_op12=False, incl_cross_terms=True, clean=CONF_CLEAN,
-        avg=CONF_AVG_WINDOW_SIZE_MIN, runs=CONF_RUNS, loc_label=DEPLOY_SITE)
+        runs=CONF_RUNS, loc_label=DEPLOY_SITE,
+        ret_errs=False)
 
+## -------------------------------------------------------------------------------
+## error comparison for models with reference T/RH and sensor-boxes T/RH
+## [op1, op2, t, op1t, op2t, h, op1h, op2h, op1op2, cross_terms]
+#avg_duration = [60]
+#vars_vector = np.array([[True, True, False, False, False,
+#                         False, False, False, False, False],
+#                        [True, True,  True, False, False,
+#                         True, False, False, False, False],
+#                        [True, True,  False, False, False,
+#                         False, False, False, False,  True],
+#                        [True, True,  True, False, False,
+#                         True, False, False, False,  True]])
+#var_names = np.array(['op1', 'op2', 't', 'op1t', 'op2t', 'h',
+#                      'op1h', 'op2h', 'op1op2', 'cross_terms'])
+#
+#mapes_n = []
+#mapes_o = []
+#xlabs = []
+#for avg in avg_duration:
+#  for (i, df) in enumerate(target_dfs):
+#    coeffs_nt, coeffs_ot, maes_no2_t, maes_o3_t, rmses_no2_t, rmses_o3_t, \
+#    mapes_no2_t, mapes_o3_t, r2_no2_t, r2_o3_t, r_no2_t, r_o3_t \
+#      = regress.regress_df(df,
+#              temps_present=t_present, hum_present=h_present, clean=CONF_CLEAN,
+#              runs=CONF_RUNS, loc_label=DEPLOY_SITE,
+#              incl_op1=vars_vector[1, 0], incl_op2=vars_vector[1, 1],
+#              incl_temps=vars_vector[1, 2], incl_op1t=vars_vector[1, 3],
+#              incl_op2t=vars_vector[1, 4], incl_hum=vars_vector[1, 5],
+#              incl_op1h=vars_vector[1, 6], incl_op2h=vars_vector[1, 7],
+#              incl_op12=vars_vector[1, 8], incl_cross_terms=vars_vector[1, 9],
+#              ret_errs=True)
+#
+#    mapes_n.append(mapes_no2_t.tolist())
+#    mapes_o.append(mapes_o3_t.tolist())
+#
+#    if i == 0:
+#      xlabs.append("Ref T:%d" % avg)
+#    else:
+#      xlabs.append("Sat T:%d" % avg)
+#
+#mapes_n = np.array(mapes_n)
+#mapes_o = np.array(mapes_o)
+#
+#for i in xrange(NUM_SENSORS):
+#  for j in xrange(NUM_SENSORS + 1):
+#    test_str = str(j + 1)
+#    if j == NUM_SENSORS:
+#      test_str = "ALL"
+#
+#    fig, ax = plotting.plot_violin(mapes_n[:, i, :, j].T,
+#          title = r"$ NO_2 $\textbf{ MAPE: Training sensor %s, Testing %d}" % \
+#          (test_str, i + 1), ylabel = r"\textit{MAPE} (\%)",
+#          x_tick_labels = xlabs)
+#
+#    txt = r"\textbf{Multifold runs}: %d" % CONF_RUNS + '\n'
+#    txt = txt + r"\textbf{Dataset size (train + test)}: %d" % dataset_size + '\n'
+#    txt = txt + r"\textbf{T} - \textit{Time duration for averaging}"
+#
+#    ax.annotate(txt, xy = (0.7, 0.8), xycoords='axes fraction')
+#    fig.savefig(DIR_PREFIX + 'no2-train%stest%d.pdf' %
+#            (test_str, i+1), format='pdf')
+#
+#    fig, ax = plotting.plot_violin(mapes_o[:, i, :, j].T,
+#          title = r"$ OX $\textbf{ MAPE: Training sensor %s, Testing %d}" % \
+#          (test_str, i + 1), ylabel = r"\textit{MAPE} (\%)",
+#          x_tick_labels = xlabs)
+#
+#    ax.annotate(txt, xy = (0.7, 0.8), xycoords='axes fraction')
+#    fig.savefig(DIR_PREFIX + 'o3-train%stest%d.pdf' %
+#            (test_str, i+1), format='pdf')
+#
+#
+## -------------------------------------------------------------------------------
+## error comparison for different average duration and linear models
+#coeffs_n = []
+#coeffs_o = []
+#maes_n = []
+#maes_o = []
+#rmses_n = []
+#rmses_o = []
+#mapes_n = []
+#mapes_o = []
+#r2_n = []
+#r2_o = []
+#r_n = []
+#r_o = []
+#means_n = []
+#means_o = []
+#stds_n = []
+#stds_o = []
+#xlabs = []
+#for i in xrange(len(avg_duration)):
+#  df = regress.window_avg(target_df, avg_duration[i])
+#  df = target_df.dropna()
+#  for j in xrange(len(vars_vector)):
+#    print ("Avg duration: %d, Vars enabled: " % avg_duration[i])\
+#            + str(var_names[vars_vector[j]])
+#
+#    coeffs_nt, coeffs_ot, maes_no2_t, maes_o3_t, rmses_no2_t, rmses_o3_t,\
+#    mapes_no2_t, mapes_o3_t, r2_no2_t, r2_o3_t, r_no2_t, r_o3_t,\
+#    mean_no2_t, mean_o3_t, std_no2_t, std_o3_t\
+#          = regress.regress_df(df,
+#              temps_present=t_present, hum_present=h_present, clean=CONF_CLEAN,
+#              runs=CONF_RUNS, loc_label=DEPLOY_SITE,
+#              incl_op1=vars_vector[j, 0], incl_op2=vars_vector[j, 1],
+#              incl_temps=vars_vector[j, 2], incl_op1t=vars_vector[j, 3],
+#              incl_op2t=vars_vector[j, 4], incl_hum=vars_vector[j, 5],
+#              incl_op1h=vars_vector[j, 6], incl_op2h=vars_vector[j, 7],
+#              incl_op12=vars_vector[j, 8], incl_cross_terms=vars_vector[j, 9],
+#              ret_errs=True)
+#
+#    if coeffs_nt is not None:
+#      repeats = coeffs_nt.shape[1] - 1
+#      coeffs_nt = np.mean(coeffs_nt, axis=0)
+#      coeffs_nt = np.repeat(coeffs_nt, repeats, axis=0)
+#      coeffs_n.append(coeffs_nt.T)
+#    else:
+#      coeffs_n = None
+#
+#    if coeffs_ot is not None:
+#      repeats = coeffs_ot.shape[1] - 1
+#      coeffs_ot = np.mean(coeffs_ot, axis=0)
+#      coeffs_ot = np.repeat(coeffs_ot, repeats, axis=0)
+#      coeffs_o.append(coeffs_ot.T)
+#    else:
+#      coeffs_o = None
+#
+#    maes_n.append(maes_no2_t.tolist())
+#    maes_o.append(maes_o3_t.tolist())
+#    rmses_n.append(rmses_no2_t.tolist())
+#    rmses_o.append(rmses_o3_t.tolist())
+#    mapes_n.append(mapes_no2_t.tolist())
+#    mapes_o.append(mapes_o3_t.tolist())
+#    r2_n.append(r2_no2_t.tolist())
+#    r2_o.append(r2_o3_t.tolist())
+#    r_n.append(r_no2_t.tolist())
+#    r_o.append(r_o3_t.tolist())
+#    means_n.append(mean_no2_t.tolist())
+#    means_o.append(mean_o3_t.tolist())
+#    stds_n.append(std_no2_t.tolist())
+#    stds_o.append(std_o3_t.tolist())
+#
+#    xlabs.append("T:%d C:%d" % (avg_duration[i],
+#                                len(var_names[vars_vector[j]])))
+#
+#maes_n = np.array(maes_n)
+#maes_o = np.array(maes_o)
+#rmses_n = np.array(rmses_n)
+#rmses_o = np.array(rmses_o)
+#mapes_n = np.array(mapes_n)
+#mapes_o = np.array(mapes_o)
+#r2_n = np.array(r2_n)
+#r2_o = np.array(r2_o)
+#r_n = np.array(r_n)
+#r_o = np.array(r_o)
+#means_n = np.array(means_n)
+#means_o = np.array(means_o)
+#stds_n = np.array(stds_n)
+#stds_o = np.array(stds_o)
+#
+#print means_n.shape, means_o.shape
+#print stds_n.shape, stds_o.shape
+## Save obtained coefficients in presentation table format
+#for i in xrange(np.shape(r_n)[0]):
+#  if coeffs_n is not None:
+#    vec = coeffs_n[i]
+#    tmp = np.mean(maes_n[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.reshape(tmp, [1, np.size(tmp)])
+#    vec = np.concatenate((vec, tmp), axis=0)
+#  else:
+#    tmp = np.mean(maes_n[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.reshape(tmp, [1, np.size(tmp)])
+#    vec = tmp
+#
+#  tmp = np.mean(rmses_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(mapes_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(r2_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(r_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = means_n[i, :, :].flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = stds_n[i, :, :].flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  np.savetxt(DIR_PREFIX + "no2-iter%d" % i, vec, fmt='%0.4g', delimiter=',')
+#
+#for i in xrange(np.shape(r_o)[0]):
+#  if coeffs_o is not None:
+#    vec = coeffs_o[i]
+#    tmp = np.mean(maes_o[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.reshape(tmp, [1, np.size(tmp)])
+#    vec = np.concatenate((vec, tmp), axis=0)
+#  else:
+#    tmp = np.mean(maes_o[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.reshape(tmp, [1, np.size(tmp)])
+#    vec = tmp
+#
+#  tmp = np.mean(rmses_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(mapes_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(r2_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = np.mean(r_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = means_o[i, :, :].flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  tmp = stds_o[i, :, :].flatten('F')
+#  tmp = np.reshape(tmp, [1, np.size(tmp)])
+#  vec = np.concatenate((vec, tmp), axis=0)
+#
+#  np.savetxt(DIR_PREFIX + "ox-iter%d" % i, vec, fmt='%0.4g', delimiter=',')
+#
+## -------------------------------------------------------------------------------
+## plot MAPE errors for training different models and different avg durations
+#training_sets = (NUM_SENSORS + 1) if (NUM_SENSORS > 1) else NUM_SENSORS
+#
+#for i in xrange(NUM_SENSORS):
+#  for j in xrange(NUM_SENSORS + 1):
+#    test_str = str(j + 1)
+#    if j == NUM_SENSORS:
+#      test_str = "ALL"
+#
+#    txt = r"\textbf{Multifold runs}: %d" % CONF_RUNS + '\n'
+#    txt = txt + r"\textbf{Dataset size (train + test)}: %d" % dataset_size + '\n'
+#    txt = txt + r"\textbf{T} - \textit{Time duration for averaging}" + '\n'
+#    txt = txt + r"\textbf{C} - \textit{No. of independent variables}"
+#
+#
+#    fig, ax = plotting.plot_violin(mapes_n[:, i, :, j].T,
+#          title = r"$ NO_2 $\textbf{ MAPE: Training sensor %s, Testing %d}"\
+#           % (test_str, i + 1), ylabel = r"\textit{MAPE} (\%)",
+#          x_tick_labels = xlabs)
+#
+#    ax.annotate(txt, xy = (0.7, 0.8), xycoords='axes fraction')
+#    fig.savefig(DIR_PREFIX + 'no2-train%stest%d.pdf' %\
+#             (test_str, i+1), format='pdf')
+#
+#    fig, ax = plotting.plot_violin(mapes_o[:, i, :, j].T,
+#          title = r"$ OX $\textbf{ MAPE: Training sensor %s, Testing %d}"\
+#            % (test_str, i + 1), ylabel = r"\textit{MAPE} (\%)",
+#          x_tick_labels = xlabs)
+#
+#    ax.annotate(txt, xy = (0.7, 0.8), xycoords='axes fraction')
+#    fig.savefig(DIR_PREFIX + 'o3-train%stest%d.pdf' %\
+#             (test_str, i+1), format='pdf')
+#
+# -------------------------------------------------------------------------------
 #pages = pdfpublish.generate_text()
-
 pdf = PdfPages(OUT_FILE_PREFIX + '-no2.pdf')
 
 # print report data
