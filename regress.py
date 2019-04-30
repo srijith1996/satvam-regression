@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import scipy.linalg as la
 from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import normalize
 from sklearn.feature_selection import f_regression, mutual_info_regression
@@ -20,6 +21,10 @@ import sys
 import datetime
 
 import plotting
+import pydotplus
+from sklearn.externals.six import StringIO
+from sklearn.tree import export_graphviz
+from IPython.display import Image
 import stats
 # ------------------------------------------------------------------------------
 CONF_DECIMALS = 6
