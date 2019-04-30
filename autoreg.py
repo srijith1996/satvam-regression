@@ -34,6 +34,7 @@ PARSE_TEMP_REF = True
 DEPLOY_SITE = 'MRIU'
 DEPLOYMENT = 2
 CONF_AVG_WINDOW_SIZE_MIN = 1
+CONF_PM_PLOTS = False
 CONF_CLEAN = 3
 CONF_RUNS = 10
 CONF_TEMP_HUM_FILE = 'ref'            # either 'ref' or 'satvam'
@@ -860,7 +861,7 @@ print 'O3 PDF ready'
 # -------------------------------------------------------------------------------
 # ---------------------- CORRELATE PM2.5 data -----------------------------------
 # -------------------------------------------------------------------------------
-if DEPLOYMENT > 1:
+if DEPLOYMENT > 1 and CONF_PM_PLOTS:
   aggregate_list = []
 
   aggregate_list.append(time_vec)
