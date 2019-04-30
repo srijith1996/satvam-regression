@@ -29,8 +29,8 @@ def formula1(we_raw, ae_raw, we_0e, ae_0e, nt, sens):
   we_raw -= we_0e
   ae_raw -= ae_0e
   we_raw -= nt * ae_raw
-  plt.plot(we_raw/sens);
-  plt.show();
+  #plt.plot(we_raw/sens);
+  #plt.show();
   return we_raw/sens
 # ------------------------------------------------------------------------------
 def formula2(we_raw, ae_raw, we_0e, ae_0e, we_0t, ae_0t, kt, sens):
@@ -40,8 +40,8 @@ def formula2(we_raw, ae_raw, we_0e, ae_0e, we_0t, ae_0t, kt, sens):
   we_raw -= we_0e
   ae_raw -= ae_0e
   we_raw -= kt * ae_raw * (we_0 / ae_0)
-  plt.plot(we_raw/sens);
-  plt.show();
+  #plt.plot(we_raw/sens);
+  #plt.show();
   return we_raw/sens
 # ------------------------------------------------------------------------------
 def formula3(we_raw, ae_raw, we_0e, ae_0e, we_0t, ae_0t, kt, sens):
@@ -51,8 +51,8 @@ def formula3(we_raw, ae_raw, we_0e, ae_0e, we_0t, ae_0t, kt, sens):
   we_raw -= we_0e
   ae_raw -= ae_0e
   we_raw -= kt * ae_raw - (we_0 - ae_0)
-  plt.plot(we_raw/sens);
-  plt.show();
+  #plt.plot(we_raw/sens);
+  #plt.show();
   return we_raw/sens
 # ------------------------------------------------------------------------------
 def formula4(we_raw, ae_raw, we_0e, ae_0e, we_0t, ae_0t, kt, sens):
@@ -85,8 +85,8 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
 
   dataFrame = dataFrame.values
-  err_no2 = np.zeros([len(NO2_WE_0T), 4, 3])
-  err_o3 = np.zeros([len(NO2_WE_0T), 4, 3])
+  err_no2 = np.zeros([len(NO2_WE_0T), 4, 5])
+  err_o3 = np.zeros([len(NO2_WE_0T), 4, 5])
 
   # iterate over sensors
   for i in xrange(np.size(dataFrame, 1)):
@@ -102,12 +102,22 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     err_no2[i, 0, 0] = stats.mae(dataFrame[:, 1], pred_no2)
     err_no2[i, 0, 1] = stats.rmse(dataFrame[:, 1], pred_no2)
     err_no2[i, 0, 2] = stats.mape(dataFrame[:, 1], pred_no2)
+    err_no2[i, 0, 3] = stats.coeff_deter(dataFrame[:, 1], pred_no2)
+    err_no2[i, 0, 4] = stats.pearson(dataFrame[:, 1], pred_no2)
+
+    #print np.mean(pred_no2)
+    #print np.std(pred_no2)
 
     pred = formula1(ox[:, 0], ox[:, 1], O3_WE_0E[i], O3_AE_0E[i],
                     NTo, SENSITIVITY_O3[i])
     err_o3[i, 0, 0] = stats.mae(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 0, 1] = stats.rmse(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 0, 2] = stats.mape(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 0, 3] = stats.coeff_deter(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 0, 4] = stats.pearson(dataFrame[:, 2], pred - pred_no2)
+
+    #print np.mean(pred)
+    #print np.std(pred)
 
     # formula 2
     pred_no2 = formula2(nx[:, 0], nx[:, 1], NO2_WE_0E[i], NO2_AE_0E[i],
@@ -115,12 +125,22 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     err_no2[i, 1, 0] = stats.mae(dataFrame[:, 1], pred)
     err_no2[i, 1, 1] = stats.rmse(dataFrame[:, 1], pred)
     err_no2[i, 1, 2] = stats.mape(dataFrame[:, 1], pred)
+    err_no2[i, 1, 3] = stats.coeff_deter(dataFrame[:, 1], pred)
+    err_no2[i, 1, 4] = stats.pearson(dataFrame[:, 1], pred)
+
+    #print np.mean(pred_no2)
+    #print np.std(pred_no2)
 
     pred = formula2(ox[:, 0], ox[:, 1], O3_WE_0E[i], O3_AE_0E[i],
                     O3_WE_0T[i], O3_AE_0T[i], KTo, SENSITIVITY_O3[i])
     err_o3[i, 1, 0] = stats.mae(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 1, 1] = stats.rmse(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 1, 2] = stats.mape(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 1, 3] = stats.coeff_deter(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 1, 4] = stats.pearson(dataFrame[:, 2], pred - pred_no2)
+
+    #print np.mean(pred)
+    #print np.std(pred)
 
     # formula 3
     pred_no2 = formula3(nx[:, 0], nx[:, 1], NO2_WE_0E[i], NO2_AE_0E[i],
@@ -128,12 +148,22 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     err_no2[i, 2, 0] = stats.mae(dataFrame[:, 1], pred_no2)
     err_no2[i, 2, 1] = stats.rmse(dataFrame[:, 1], pred_no2)
     err_no2[i, 2, 2] = stats.mape(dataFrame[:, 1], pred_no2)
+    err_no2[i, 2, 3] = stats.coeff_deter(dataFrame[:, 1], pred_no2)
+    err_no2[i, 2, 4] = stats.pearson(dataFrame[:, 1], pred_no2)
+
+    #print np.mean(pred_no2)
+    #print np.std(pred_no2)
 
     pred = formula3(ox[:, 0], ox[:, 1], O3_WE_0E[i], O3_AE_0E[i],
                     O3_WE_0T[i], O3_AE_0T[i], K_To, SENSITIVITY_O3[i])
     err_o3[i, 2, 0] = stats.mae(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 2, 1] = stats.rmse(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 2, 2] = stats.mape(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 2, 3] = stats.coeff_deter(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 2, 4] = stats.pearson(dataFrame[:, 2], pred - pred_no2)
+
+    #print np.mean(pred)
+    #print np.std(pred)
 
     # formula 4
     pred_no2 = formula4(nx[:, 0], nx[:, 1], NO2_WE_0E[i], NO2_AE_0E[i],
@@ -141,13 +171,27 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     err_no2[i, 3, 0] = stats.mae(dataFrame[:, 1], pred_no2)
     err_no2[i, 3, 1] = stats.rmse(dataFrame[:, 1], pred_no2)
     err_no2[i, 3, 2] = stats.mape(dataFrame[:, 1], pred_no2)
+    err_no2[i, 3, 3] = stats.coeff_deter(dataFrame[:, 1], pred_no2)
+    err_no2[i, 3, 4] = stats.pearson(dataFrame[:, 1], pred_no2)
+
+    #print np.mean(pred_no2)
+    #print np.std(pred_no2)
 
     pred = formula4(ox[:, 0], ox[:, 1], O3_WE_0E[i], O3_AE_0E[i],
                     O3_WE_0T[i], O3_AE_0T[i], K__To, SENSITIVITY_O3[i])
     err_o3[i, 3, 0] = stats.mae(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 3, 1] = stats.rmse(dataFrame[:, 2], pred - pred_no2)
     err_o3[i, 3, 2] = stats.mape(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 3, 3] = stats.coeff_deter(dataFrame[:, 2], pred - pred_no2)
+    err_o3[i, 3, 4] = stats.pearson(dataFrame[:, 2], pred - pred_no2)
 
+    #print np.mean(pred)
+    #print np.std(pred)
+
+  #np.savetxt("alpha-no2-err1.csv", err_no2[0].T, fmt='%0.4g', delimiter=',')
+  #np.savetxt("alpha-no2-err2.csv", err_no2[1].T, fmt='%0.4g', delimiter=',')
+  #np.savetxt("alpha-o3-err1.csv", err_o3[0].T, fmt='%0.4g', delimiter=',')
+  #np.savetxt("alpha-o3-err2.csv", err_o3[1].T, fmt='%0.4g', delimiter=',')
   print err_no2
   print err_o3
 # ------------------------------------------------------------------------------
