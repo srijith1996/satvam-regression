@@ -159,6 +159,36 @@ def format_x_date(fig, ax):
   ax.set_xlabel(r'\textbf{Time}')
   plt.xticks(rotation=30)
 # ------------------------------------------------------------------------------
+def plot_xy(x, y, title='', xlabel='', ylabel='', ylim=None, leg_labels=None):
+  '''
+    Plot on X-Y plane
+  '''
+
+  fig = plt.figure()
+  ax = fig.add_subplot('111')
+
+  set_plot_labels(ax, title, xlabel, ylabel)
+  if ylim is not None:
+    ax.set_ylim(ylim)
+
+  ax.set_xticks(x)
+  ax.grid(b=True, which='major', axis='both',
+          color='gray', linestyle='--', alpha=0.5)
+
+  ax.grid(b=True, which='minor', axis='both',
+          color='gray', linestyle=':', alpha=0.3)
+
+  if len(y.shape) == 1:
+    y = np.reshape(y, [np.size(y), 1])
+
+  for (i, col) in enumerate(y.T):
+    ax.plot(x, col, alpha=1.0, linewidth=1.5, color=colorWheel[i+2])
+
+  if leg_labels is not None:
+    ax.legend(labels=leg_labels, loc=3)
+
+  return fig, ax
+# ------------------------------------------------------------------------------
 def ts_plot(epochs, Y, title='', ylabel='',
             ylim=None, leg_labels=None, ids=[]):
   '''
@@ -348,20 +378,55 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto',
 
   return fig, ax
 # ------------------------------------------------------------------------------
-def plot_stem(x, y, title='', xlabel='', ylabel=''):
+def plot_stem(x, y, title='', xlabel='', ylabel='', ylim=100):
   
   fig = plt.figure()
   ax = fig.add_subplot('111')
 
   set_plot_labels(ax, title, xlabel, ylabel)
 
-  plt.grid()
-  ax.yaxis.grid(b=True, which='major', color='g', linestyle='-', alpha=0.2)
-  ax.xaxis.grid(b=True, which='major', color='g', linestyle='-', alpha=0.2)
+  ax.stem(x, y, linestyle='-', alpha=1.0, marker='o')
+  ax.set_ylim([0, ylim])
 
-  ax.stem(x, y, alpha=0.8, linestyle='-')
+  plt.grid()
+  plt.minorticks_on()
+  ax.yaxis.grid(b=True, which='major', linestyle='-', alpha=0.8)
+  ax.yaxis.grid(b=True, which='minor', linestyle=':', alpha=0.5)
+  ax.xaxis.grid(b=True, which='major', linestyle='-', alpha=0.8)
+  ax.xaxis.grid(b=True, which='minor', linestyle=':', alpha=0.5)
 
   return fig, ax
+# ------------------------------------------------------------------------------
+def plot_err_dist(true_val, pred, num_bins=40, pad=0.3,
+                  title='', xlabel=''):
+  '''
+    Plot the distribution of error w.r.t true vals
+  '''
+
+  err = np.abs((pred - true_val)/true_val) * 100
+  bin_edges = np.arange(0, num_bins + 1) * np.max(true_val)/num_bins
+
+  mean_err = np.zeros([num_bins, ])
+  mean = np.zeros([num_bins, ])
+  lens = np.zeros([num_bins, ])
+
+  for i in xrange(len(bin_edges)-1):
+    mean_err[i] = np.mean(err[[(val >= bin_edges[i]
+                            and val < bin_edges[i+1]) for val in true_val]])
+    mean[i] = np.mean(true_val[[(val >= bin_edges[i]
+                            and val < bin_edges[i+1]) for val in true_val]])
+    lens[i] = np.size(true_val[[(val >= bin_edges[i]
+                            and val < bin_edges[i+1]) for val in true_val]])
+
+  fig, ax = plotting.plot_stem(mean, mean_err,
+              title=title, xlabel=xlabel,
+              ylabel=r'\textit{Mean Absolute Percentage Error}')
+
+  for i in xrange(num_bins):
+    ax.annotate('%d' % lens[i], xy=(mean[i], mean_err[i] + pad), rotation = 80, alpha=0.8,
+                fontsize='small')
+
+  return fig
   
 # ------------------------------------------------------------------------------
 def plot_hist(ax, v, bins=20, title='', ids=None):

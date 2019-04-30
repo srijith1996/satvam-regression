@@ -32,6 +32,24 @@ no2_fignames = []
 o3_fignames = []
 # ==============================================================================
 # Statistics routines
+def preclean_df(X, cols=None):
+
+  sizex = len(X)
+
+  print "Pre-cleaning infinite and negative values (set_size %d)" % sizex
+  X = X.replace([np.inf, -np.inf], np.nan)
+  if cols is not None:
+    y = X.iloc[:, cols]
+
+    # remove non-positive ppb values
+    X = X[y.applymap(lambda x: x > 0 or np.isnan(x)).all(1)]
+  else:
+    X = X[X.applymap(lambda x: x > 0 or np.isnan(x)).all(1)]
+
+  print "%d negative entries dropped" % (sizex - len(X))
+  return X
+
+# ------------------------------------------------------------------------------
 def clean_data(X, sigma_mult, clean_ref=False):
   '''
      Clean data beyond sigma_mult standard deviations from the mean
@@ -46,12 +64,8 @@ def clean_data(X, sigma_mult, clean_ref=False):
   '''
   
   print "Cleaning x+-%dsigma" % sigma_mult
-
-  X = X.replace([np.inf, -np.inf], np.nan).dropna()
-  # remove non-positive ppb values
-  X = X[X.applymap(lambda x: x > 0).all(1)]
-
   sizex = len(X)
+
   # remove values beyond +-sigma_mult * sigma
   mu = np.mean(X.values, axis=0)
   sigma = np.std(X.values, axis=0)
@@ -76,25 +90,33 @@ def clean_data(X, sigma_mult, clean_ref=False):
 def window_avg(data_df, window_size):
   '''
     Average contiguous chunks of data with size, window_size
+
+    NOTE:  Features are assumed to be columns, 1st column has timestamp
+           epochs
   '''
   vals = data_df.values
   avg_vals = []
 
-  for i in xrange(vals.shape[0]):
+  i = 0
+  k = 0
+  while i < vals.shape[0]:
     start_t = vals[i, 0]
 
-    # record boundary in j
-    for j in range(1, vals.shape[0] - i):
-      if (vals[i+j, 0] - start_t) >= (window_size * 60):
+    # record boundary in wd_bdry
+    wd_bdry = i + 1
+    for j in range(i + 1, vals.shape[0]):
+      if (vals[j, 0] - start_t) >= (window_size * 60):
+        wd_bdry = j
         break
 
-    window = np.nanmean(vals[range(i, i+j), 1:], axis=0)
+    #print k, i, sec_bdry
+    window = np.nanmean(vals[range(i, wd_bdry), 1:], axis=0)
     avg_vals.append(window.tolist())
-    avg_vals[i].insert(0, start_t)
-    i = i + j
+    avg_vals[k].insert(0, start_t)
+    i = wd_bdry
+    k = k + 1
 
   avg_vals = pd.DataFrame(avg_vals).dropna()
-  avg_vals = avg_vals.values
 
   return avg_vals
 # ==============================================================================
@@ -430,7 +452,20 @@ def plot_coeff_violins(coeff, names=[], sens_type=''):
     fignames.append("%s-coeff%s" % (sens_type.lower(), names[i].lower()))
 # ==============================================================================
 # Routines for regression
-def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
+def get_metrics(true_val, pred):
+  metrics = []
+  metrics.append(stats.mae(true_val, pred))
+  metrics.append(stats.rmse(true_val, pred))
+  metrics.append(stats.mape(true_val, pred))
+  metrics.append(stats.coeff_deter(true_val, pred))
+  metrics.append(stats.pearson(true_val, pred))
+  metrics.append(np.mean(pred))
+  metrics.append(np.std(pred))
+
+  return metrics
+# ------------------------------------------------------------------------------
+def regress_once(X, X_t, y, labels=None, o3_y=None, no2_pred=None,
+                 train_size=0.7, intercept=True, string=''):
   '''
      Perform regression on the given data-set and return coefficients
      and error metrics
@@ -440,6 +475,8 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
       y      - Values of y in linear regression
       labels - For computation of error only values corresponding to
                non-zero labels will be considered
+      no2_pred - Prediction values for NO2 sensor (size same as y)
+                  default - Don't subtract NO2 from output prediction
       train_size - ratio of the complete data-set used for training
       intercept - Include intercept in regression
 
@@ -453,14 +490,24 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
 
   perm = np.arange(X.shape[0])
   perm = np.random.permutation(perm)
+  if X_t is None:
+    X_t = X
 
   X_ = X[perm, :]
+  X_t = X_t[perm, :train_size]
   y_ = y[perm]
 
   X_train = X_[:train_size, :]
   y_train = y_[:train_size]
-  X_test = X_[train_size:, :]
-  y_test = y_[train_size:]
+  X_test = X_t[train_size:, :]
+
+  if o3_y is not None:
+    y_test = o3_y[perm][train_size:]
+  else:
+    y_test = y_[train_size:]
+
+  if no2_pred is not None:
+    no2_pred = no2_pred[perm][train_size:]
 
   # train model
   reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
@@ -471,41 +518,27 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
     labels = labels[train_size:]
     X_test = X_test[(labels != 0)]
     y_test = y_test[(labels != 0)]
+    if no2_pred is not None:
+      no2_pred = no2_pred[(labels != 0)]
 
-  metrics = []
   pred = reg.predict(X_test)
+  if no2_pred is not None:
+    pred = pred - no2_pred
   
   # plot of mean errors vs reference conc.
-  #err = np.abs(y_test - pred)
-  #num_bins = 40
-  #pad = 5
-  #bin_edges = np.arange(0, num_bins + 1) * np.max(y_test)/num_bins
-  #mean_err = np.zeros([num_bins, ])
-  #mean = np.zeros([num_bins, ])
-  #lens = np.zeros([num_bins, ])
+  #fig = plotting.plot_err_dist(y_test, pred,
+  #            title=r'\textbf{Percentage errors of concentration ranges}',
+  #            xlabel=r'\textit{Reference concentration (p.p.b.)}')
 
-  #for i in xrange(len(bin_edges)-1):
-  #  mean_err[i] = np.mean(err[[(val >= bin_edges[i]
-  #                          and val < bin_edges[i+1]) for val in y_test]])
-  #  mean[i] = np.mean(y_test[[(val >= bin_edges[i]
-  #                          and val < bin_edges[i+1]) for val in y_test]])
-  #  lens[i] = np.size(y_test[[(val >= bin_edges[i]
-  #                          and val < bin_edges[i+1]) for val in y_test]])
+  #if o3_y is None:
+  #  fig.savefig('/home/srijith/satvam/calib-data/inf/mriu-mape-dist-tst/no2-mape-ranges-'+string+'.pdf',
+  #            format='pdf')
+  #else:
+  #  fig.savefig('/home/srijith/satvam/calib-data/inf/mriu-mape-dist-tst/o3-mape-ranges-'+string+'.pdf',
+  #            format='pdf')
 
-  #fig, ax = plotting.plot_stem(mean, mean_err,
-  #            title=r'\textbf{Mean errors of concentration ranges}',
-  #            xlabel=r'\textit{Reference concentration (p.p.b.)}',
-  #            ylabel=r'\textit{Mean Absolute error (p.p.b.)}')
+  metrics = get_metrics(y_test, pred)
   
-  #for i in xrange(num_bins):
-  #  ax.annotate('n = %d' % lens[i], xy=(mean[i], mean_err[i] + pad), rotation = 80)
-
-  #plt.show()
-  
-  metrics.append(stats.mae(y_test, pred))
-  metrics.append(stats.rmse(y_test, pred))
-  metrics.append(stats.mape(y_test, pred))
-
   # training model
   pred = reg.predict(X_train)
   dev = stats.mae(y_train, pred)
@@ -514,6 +547,119 @@ def regress_once(X, y, labels=None, train_size=0.7, intercept=True):
   coeffs.append(reg.intercept_)
 
   return coeffs, metrics
+# ------------------------------------------------------------------------------
+def dtr_regress(X, X_t, y, labels=None, train_size=0.7,
+                viz_tree=False, fname=None, optimize_depth=False,
+                consider_mape=False):
+  '''
+     Perform regression on the given data-set and return coefficients
+     and error metrics
+    
+     Parameters:
+      X      - Values of X in linear regression
+      X_t    - X for testing, if None uses random 30% from X
+      y      - Values of y in linear regression
+      labels - For computation of error only values corresponding to
+               non-zero labels will be considered
+      train_size - ratio of the complete data-set used for training
+      viz_tree - Save an image of the regression tree if true
+      fname  - Name used to save decision tree figures.  Only used if
+               viz_tree is true
+      optimize_depth - Use depth as hyperparameter and choose the optimum
+                       depth for plots and visualization
+      consider_mape  - Use MAPE as a metric for tuning hyper-parameters
+
+     Return:
+      metrics - Array of metrics [MAE, RMSE, MAPE, R^2, r, mu, sigma]
+   '''
+
+  train_size = int(np.floor(train_size * X.shape[0]))
+
+  perm = np.arange(X.shape[0])
+  perm = np.random.permutation(perm)
+  if X_t is None:
+    X_t = X
+
+  X_ = X[perm, :]
+  X_t = X_t[perm, :train_size]
+  y_ = y[perm]
+
+  X_train = X_[:train_size, :]
+  y_train = y_[:train_size]
+  X_test = X_t[train_size:, :]
+
+  y_test = y_[train_size:]
+
+  # test model
+  if labels is not None:
+    labels = labels[perm]
+    labels = labels[train_size:]
+    X_test = X_test[(labels != 0)]
+    y_test = y_test[(labels != 0)]
+
+  metrics = []
+  if optimize_depth:
+
+    max_depths = np.arange(2, 20)
+    min_err = np.inf
+    min_mape = np.inf
+    errs = np.zeros([np.size(max_depths), 2])
+
+    for (i, depth) in enumerate(max_depths):
+      # train model
+      reg = DecisionTreeRegressor(criterion='mse',
+              max_depth=depth, min_samples_split=0.05)
+      reg.fit(X_train, y_train)
+      pred = reg.predict(X_test)
+
+      errs[i, 0] = stats.rmse(y_test, pred)
+      errs[i, 1] = stats.mape(y_test, pred)
+
+      idx = 1 if consider_mape else 0
+      if errs[i, idx] < min_err:
+        metrics = get_metrics(y_test, pred)
+        min_err = errs[i, idx]
+        best_reg = reg
+
+    fig, ax = plotting.plot_xy(max_depths, errs,
+            title=r'\textbf{Error vs. Decision tree depth',
+            xlabel=r'\textit{Tree depth}',
+            ylabel='', leg_labels=['RMSE', 'MAPE'])
+
+    #no2_figs.append(fig)
+    #no2_fignames.append('rms-err-depth-dtr')
+    #plt.show()
+
+  else:
+    best_reg = DecisionTreeRegressor(criterion='mse',
+              max_depth=None, min_samples_split=0.05)
+    best_reg.fit(X_train, y_train)
+    pred = best_reg.predict(X_test)
+    metrics = get_metrics(y_test, pred)
+
+  if viz_tree:
+    dot_data = StringIO()
+    if fname is None:
+      fname = "dtree.png"
+
+    export_graphviz(best_reg, out_file=dot_data, filled=True,
+                    rounded=True, special_characters=True)
+
+    graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+    graph.write_png(fname)
+
+  #fig = plotting.plot_err_dist(y_test, pred,
+  #            title=r'\textbf{Percentage errors of concentration ranges}',
+  #            xlabel=r'\textit{Reference concentration (p.p.b.)}')
+
+  #if o3_y is None:
+  #  fig.savefig('/home/srijith/satvam/calib-data/inf/tmp/no2-mape-ranges-'+string+'.pdf',
+  #            format='pdf')
+  #else:
+  #  fig.savefig('/home/srijith/satvam/calib-data/inf/tmp/o3-mape-ranges-'+string+'.pdf',
+  #            format='pdf')
+
+  return metrics
 # ------------------------------------------------------------------------------
 def tls_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
   '''
@@ -613,15 +759,18 @@ def rfr_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
   metrics.append(stats.mae(y_test, pred))
   metrics.append(stats.rmse(y_test, pred))
   metrics.append(stats.mape(y_test, pred))
+  metrics.append(stats.coeff_deter(y_test, pred))
+  metrics.append(stats.pearson(y_test, pred))
 
   # training model
   #pred = reg.predict(X_train)
   #dev = stats.mae(y_train, pred)
-  print reg.feature_importances_
+  #print reg.feature_importances_
 
   return metrics
 # ------------------------------------------------------------------------------
-def regress_sensor_type(X, y, epochs, train_ratio, runs):
+def regress_sensor_type(X, y, sensor, epochs, train_ratio,
+                        runs, reg='', no2_pred=None, o3_y=None):
   '''
      Train on all sensors of a certain type and obtain self
      trained and cross trained error measures
@@ -629,8 +778,17 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
      Params:
       X       - list of training inputs for each sensor
       y       - training output values common to all
+      sensor  - type of sensor. Any one of the following:
+                'no2'   - NO2 sensor
+                'ox'    - OX sensor
       train_ratio - Ratio of training set to consider
       runs    - Number of runs for each sensor
+      reg     - algorithm to use for regression. Any one of the following:
+                'tls'   - Total least squares
+                'rfr'   - Random Forest regression
+                default - Oridinary Least squares
+      no2_pred - predicted NO2, None if sensor='no2'
+      o3_y     - reference o3 values if sensor='ox'
 
      Return:
       coeffs, maes, rmses, mapes
@@ -638,6 +796,13 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
       coeffs has shape [num_sensors, runs, (num_sensors + 1), num_coeffs]
       maes, rmses and mapes have shape [num_sensors, runs, (num_sensors + 1)]
   '''
+
+  #if sensor == 'ox' and (no2_pred is None or o3_y is None):
+  #  raise ValueError("OX sensor regression: either NO2 prediction\
+  #           or O3 output not specified")
+  #elif sensor == 'no2':
+  #  no2_pred = None
+  #  o3_y = None
 
   # coefficients for all steps carried out
   # shape: N * R * (N + 1) * m
@@ -648,7 +813,11 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
   maes = np.zeros([len(X), runs, (len(X) + 1)])
   rmses = np.zeros([len(X), runs, (len(X) + 1)]) 
   mapes = np.zeros([len(X), runs, (len(X) + 1)]) 
+  r2 = np.zeros([len(X), runs, (len(X) + 1)]) 
+  r = np.zeros([len(X), runs, (len(X) + 1)]) 
 
+  mean = np.zeros([len(X), runs, (len(X) + 1)]) 
+  std = np.zeros([len(X), runs, (len(X) + 1)]) 
   for j in xrange(len(X)):
 
     print "Sensor: " + str(j + 1)
@@ -658,26 +827,48 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
                             % ((i+1), (i+1) * 100/runs))
       for k in xrange(len(X)):
 
+        string = 'tr%dte%d' % (k+1, j+1)
         # Train on sensor k
-        if CONF_REG == 'tls':
-          tmpcoeffs, metrics = tls_regress_once(X[k], y, train_size=train_ratio)
-        elif CONF_REG == 'rfr':
-          metrics = rfr_regress_once(X[k], y, train_size=train_ratio)
+        if reg == 'tls':
+          tmpcoeffs, metrics = tls_regress_once(X[k], X[j], y, train_size=train_ratio)
+
+        elif reg == 'rfr':
+          metrics = rfr_regress_once(X[k], X[j], y, train_size=train_ratio)
           tmpcoeffs = None
+
         else:
-          tmpcoeffs, metrics = regress_once(X[k], y, train_size=train_ratio)
+          if sensor == 'ox':
+            tmpcoeffs, metrics = regress_once(X[k], X[j], y, train_size=train_ratio,
+                                            no2_pred=no2_pred[j][k, :],
+                                            o3_y=o3_y, string=string)
+          else:
+            tmpcoeffs, metrics = regress_once(X[k], X[j], y, train_size=train_ratio,
+                                              string=string)
         coeffs[j, i, k][:] = tmpcoeffs
         maes[j, i, k] = metrics[0]
         rmses[j, i, k] = metrics[1]
         mapes[j, i, k] = metrics[2]
+        r2[j, i, k] = metrics[3]
+        r[j, i, k] = metrics[4]
+
+        mean[j, i, k] = metrics[5]
+        std[j, i, k] = metrics[6]
 
       # build aggregate dataset
       agg_X = []
       agg_y = np.array([])
+      if sensor == 'ox':
+        agg_oy = np.array([])
+        agg_np = np.array([])
+
       labels = np.zeros([len(X) * np.shape(X[0])[0],])
       for (k, X_sensor) in enumerate(X):
 
         agg_y = np.concatenate((agg_y, y), axis=0)
+        if sensor == 'ox':
+          agg_oy = np.concatenate((agg_oy, o3_y), axis=0)
+          agg_np = np.concatenate((agg_np, no2_pred[j][-1,:]), axis=0)
+
         if k == 0:
           agg_X = X_sensor
         else:
@@ -687,21 +878,40 @@ def regress_sensor_type(X, y, epochs, train_ratio, runs):
           labels[k * np.shape(X[0])[0] : (k+1) * np.shape(X[0])[0]] = 1
 
       # train on aggregate dataset
-      tmpcoeffs, metrics = regress_once(agg_X, agg_y,
-                    labels=labels, train_size=train_ratio)
+      string = 'trALLte%d' % (j+1)
+      if sensor == 'ox':
+        tmpcoeffs, metrics = regress_once(agg_X, None, agg_y, train_size=train_ratio,
+                                        labels=labels, no2_pred=agg_np,
+                                        o3_y=agg_oy, string=string)
+      else:
+        tmpcoeffs, metrics = regress_once(agg_X, None, agg_y,
+                    labels=labels, train_size=train_ratio, string=string)
       coeffs[j, i, -1][:] = tmpcoeffs
       maes[j, i, -1] = metrics[0]
       rmses[j, i, -1] = metrics[1]
       mapes[j, i, -1] = metrics[2]
+      r2[j, i, -1] = metrics[3]
+      r[j, i, -1] = metrics[4]
+
+      mean[j, i, -1] = metrics[5]
+      std[j, i, -1] = metrics[6]
 
     print "\nSensor %d DONE" % (j+1)
 
-  return coeffs, maes, rmses, mapes
+  # tmp: for getting mean and std
+  mean = np.mean(mean, axis=1)
+  std = np.mean(std, axis=1)
+
+  print mean
+  print std
+
+  #return None, maes, rmses, mapes, r2, r, mean, std
+  return coeffs, maes, rmses, mapes, r2, r, mean, std
 
 # ------------------------------------------------------------------------------
 def preproc(data, temps_present, hum_present, incl_op1, incl_op2,
             incl_temps, incl_op1t, incl_op2t, incl_hum, incl_op1h, incl_op2h,
-            incl_op12, incl_cross_terms, clean, avg, runs, loc_label,
+            incl_op12, incl_cross_terms, clean, runs, loc_label,
             training_set_ratio = 0.7):
 
 
@@ -709,8 +919,7 @@ def preproc(data, temps_present, hum_present, incl_op1, incl_op2,
   if clean is not None:
     data = clean_data(data, clean)
 
-  if avg is not None:
-    data = window_avg(data, avg)
+  data = data.values
 
   # remove possible outliers
   #tmp_data = pd.DataFrame(data.iloc[:, 0])
@@ -887,14 +1096,16 @@ def preproc(data, temps_present, hum_present, incl_op1, incl_op2,
 
   #visualize_rawdata(epochs, no2_x, no2_y, ox_x, o3_y)
 
-  return epochs, no2_x, no2_y, ox_x, ox_y, coeffs_no2_names, coeffs_ox_names
+  return epochs, no2_x, no2_y, ox_x, o3_y, ox_y,\
+         coeffs_no2_names, coeffs_ox_names
 # ------------------------------------------------------------------------------
 def regress_df(data, temps_present=False, hum_present=False,
                incl_op1=True, incl_op2=False,
                incl_temps=False, incl_op1t=False, incl_op2t=False,
                incl_hum=False, incl_op1h=False, incl_op2h=False,
                incl_op12=False, incl_cross_terms=False, clean=None,
-               avg=None, runs=1000, loc_label='---'):
+               avg=None, runs=1000, save_fscores=False,
+               loc_label='---', ret_errs=False):
 
   '''
     Regress the given dataframe with values for sensor features and
@@ -905,85 +1116,122 @@ def regress_df(data, temps_present=False, hum_present=False,
   '''
 
   training_set_ratio = 0.7
-  epochs, no2_x, no2_y, ox_x, ox_y, coeffs_no2_names, coeffs_ox_names = preproc(
-                        data, temps_present, hum_present,
-                        incl_op1, incl_op2, incl_temps, incl_op1t,
-                        incl_op2t, incl_hum, incl_op1h, incl_op2h,
-                        incl_op12, incl_cross_terms, clean, avg,
-                        runs, loc_label, training_set_ratio)
-
-  del data
+  epochs, no2_x, no2_y, ox_x, o3_y, ox_y, coeffs_no2_names,\
+         coeffs_ox_names = preproc(
+              data, temps_present, hum_present,
+              incl_op1, incl_op2, incl_temps, incl_op1t,
+              incl_op2t, incl_hum, incl_op1h, incl_op2h,
+              incl_op12, incl_cross_terms, clean,
+              runs, loc_label, training_set_ratio)
 
   # process and regress data: multifold
-  print "\nFor NO_2 sensors....."
-  coeffs_no2, maes_no2, rmses_no2, mapes_no2 = regress_sensor_type(
-        no2_x, no2_y, epochs, training_set_ratio, runs)
+  if CONF_REG == 'dtr':
+    no2_metrics = []
+    o3_metrics = []
 
-  print "\nFor OX sensors....."
-  coeffs_ox, maes_ox, rmses_ox, mapes_ox = regress_sensor_type(
-        ox_x, ox_y, epochs, training_set_ratio, runs)
-  
-  # mean coefficients should have the shape (N+1) * m
-  mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1))
-  mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1))
+    for (i, x) in enumerate(no2_x):
+      no2_metrics.append(dtr_regress(x, None, no2_y,
+                                     train_size=training_set_ratio,
+                                     viz_tree=True,
+                                     fname='n-tree%d.png'%i,
+                                     optimize_depth=True,
+                                     consider_mape=True))
+    for (i, x) in enumerate(ox_x):
+      o3_metrics.append(dtr_regress(x, None, o3_y,
+                                   train_size=training_set_ratio,
+                                   viz_tree=True,
+                                   fname='o-tree%d.png'%i,
+                                   optimize_depth=True,
+                                   consider_mape=True))
 
-  # find p_vals and chi^2 values of the features
-  #for x in no2_x:
-  #  x = np.concatenate((x, np.ones([np.shape(x)[0], 1])), axis=1)
-  ##  f, p_vals = f_regression(np.dot(x, mean_no2_coeffs.T), no2_y)
-  #  print f, p_vals
-#
-#  for x in ox_x:
-##    x = np.concatenate((x, np.ones([np.shape(x)[0], 1])), axis=1)
-#    f, p_vals = f_regression(np.dot(x, mean_ox_coeffs.T), ox_y)
-#    print f, p_vals
+    print no2_metrics
+    print o3_metrics
 
-  for x in no2_x:
-    x = normalize(x, axis=0)
-    #mi = mutual_info_regression(x, no2_y)
-    mi = f_regression(x, no2_y)
-    print mi
+  else:
+    # always train no2 before o3
+    print "\nFor NO_2 sensors....."
+    coeffs_no2, maes_no2, rmses_no2, mapes_no2, r2_no2, r_no2,\
+    means_no2, stds_no2 = regress_sensor_type(
+          no2_x, no2_y, 'no2', epochs, training_set_ratio,
+          runs, CONF_REG)
 
-  for x in ox_x:
-    x = normalize(x, axis=0)
-    #mi = mutual_info_regression(x, ox_y)
-    mi = f_regression(x, ox_y)
-    print mi
+    # store no2 coefficients
+    no2_pred = []
+    for x in no2_x:
+      x = np.concatenate((x, np.ones([x.shape[0],1])), axis=1)
+      mean_coeffs_no2 = np.mean(coeffs_no2, axis=0)
+      mean_coeffs_no2 = np.mean(mean_coeffs_no2, axis=0)
+      #print mean_coeffs_no2
+      no2_pred.append(np.dot(mean_coeffs_no2, x.T))    # shape: (num_sens + 1, data_len)
 
-  # plot violins for error metrics
-  plot_error_violins(maes_no2, name='MAE',
-        full_name='Mean Absolute Error', sens_type='NO_2');
-  plot_error_violins(rmses_no2, name='RMSE',
-        full_name='Root Mean Square Error', sens_type='NO_2');
-  plot_error_violins(mapes_no2, name='MAPE',
-        full_name='Mean Absolute Percentage Error', sens_type='NO_2');
+    print "\nFor OX sensors....."
+    coeffs_ox, maes_ox, rmses_ox, mapes_ox, r2_ox, r_ox,\
+    means_ox, stds_ox = regress_sensor_type(
+          ox_x, o3_y, 'ox', epochs, training_set_ratio,
+          runs, CONF_REG, no2_pred=no2_pred, o3_y=o3_y)
 
-  plot_error_violins(maes_ox, name='MAE',
-        full_name='Mean Absolute Error', sens_type='O_X');
-  plot_error_violins(rmses_ox, name='RMSE',
-        full_name='Root Mean Square Error', sens_type='O_X');
-  plot_error_violins(mapes_ox, name='MAPE',
-        full_name='Mean Absolute Percentage Error', sens_type='O_X');
+    # mean coefficients should have the shape (N+1) * m
+    mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1))
+    mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1))
 
-  # ravel the first two dimensions
-  coeffs_no2 = np.reshape(coeffs_no2,
-        [coeffs_no2.shape[0] * coeffs_no2.shape[1],
-         coeffs_no2.shape[2],
-         coeffs_no2.shape[3]])
+    # plot violins for error metrics
+    plot_error_violins(maes_no2, name='MAE',
+          full_name='Mean Absolute Error', sens_type='NO_2');
+    plot_error_violins(rmses_no2, name='RMSE',
+          full_name='Root Mean Square Error', sens_type='NO_2');
+    plot_error_violins(mapes_no2, name='MAPE',
+          full_name='Mean Absolute Percentage Error', sens_type='NO_2');
 
-  coeffs_ox = np.reshape(coeffs_ox,
-        [coeffs_ox.shape[0] * coeffs_ox.shape[1],
-         coeffs_ox.shape[2],
-         coeffs_ox.shape[3]])
+    plot_error_violins(maes_ox, name='MAE',
+          full_name='Mean Absolute Error', sens_type='O_X');
+    plot_error_violins(rmses_ox, name='RMSE',
+          full_name='Root Mean Square Error', sens_type='O_X');
+    plot_error_violins(mapes_ox, name='MAPE',
+          full_name='Mean Absolute Percentage Error', sens_type='O_X');
 
-  print coeffs_no2_names
-  print coeffs_ox_names
-  # plot violins for coefficients
+    # ravel the first two dimensions
+    coeffs_no2 = np.reshape(coeffs_no2,
+          [coeffs_no2.shape[0] * coeffs_no2.shape[1],
+           coeffs_no2.shape[2],
+           coeffs_no2.shape[3]])
 
-  #plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
-  #plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
+    coeffs_ox = np.reshape(coeffs_ox,
+          [coeffs_ox.shape[0] * coeffs_ox.shape[1],
+           coeffs_ox.shape[2],
+           coeffs_ox.shape[3]])
+    
+    print coeffs_no2_names
+    print coeffs_ox_names
 
-  return no2_figs, no2_fignames, o3_figs, o3_fignames
+    # plot violins for coefficients
+    plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
+    plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
+
+  # find p_vals of features
+  if save_fscores:
+    for (i, x) in enumerate(no2_x):
+      x = normalize(x, axis=0)
+      f, p = f_regression(x, no2_y)
+      f = np.concatenate((f, p), axis=1)
+      np.savetxt(DIR_PREFIX + ("fscores-no2-sens%d" % (i+1)),
+                 f, fmt='%0.4e', delimiter=',')
+
+    for (i, x) in enumerate(o3_x):
+      x = normalize(x, axis=0)
+      f, p = f_regression(x, ox_y)
+      f = np.concatenate((f, p), axis=1)
+      np.savetxt(DIR_PREFIX + ("fscores-ox-sens%d" % (i+1)),
+                 f, fmt='%0.4e', delimiter=',')
+
+  # if needed in future....
+  #mi = mutual_info_regression(x, no2_y)
+
+  if ret_errs:
+    return coeffs_no2, coeffs_ox, maes_no2, maes_ox, rmses_no2,\
+           rmses_ox, mapes_no2, mapes_ox, r2_no2, r2_ox, r_no2, r_ox,\
+           means_no2, means_ox, stds_no2, stds_ox
+  else:
+    return no2_figs, no2_fignames, o3_figs, o3_fignames
 
 # ----------------------------------------------------------------------------------
 def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False, loc_label='---'):

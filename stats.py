@@ -40,11 +40,9 @@ def pearson(y_true, y_pred):
 # ------------------------------------------------------------------------------
 def coeff_deter(y_true, y_pred):
 
-  N = np.size(y_true)
-
-  mu = (1/N) * np.sum(y_true)
-  ss_tot = np.sum(np.square(y_true - mu))
+  mu = np.mean(y_true)
   ss_res = np.sum(np.square(y_true - y_pred))
+  ss_tot = np.sum(np.square(y_true - mu))
 
   r2 = 1 - (ss_res / ss_tot)
 
