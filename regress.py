@@ -22,13 +22,19 @@ import datetime
 
 import plotting
 import pydotplus
-from sklearn.externals.six import StringIO
+from sklearn.externals.six import StringIO  
 from sklearn.tree import export_graphviz
 from IPython.display import Image
 import stats
+
+# for model tree regression
+from ModelTree import ModelTree
+from linear_regr import linear_regr
+
+import alphasense as alp
 # ------------------------------------------------------------------------------
 CONF_DECIMALS = 6
-CONF_REG = 'rfr'
+CONF_REG = 'mtr'
 # ------------------------------------------------------------------------------
 # list of all figures plotted
 no2_figs = []
@@ -89,6 +95,7 @@ def clean_data(X, sigma_mult, clean_ref=False):
           and x < ranges[1][i])).all(1)]
 
   print "%d entries dropped" % (sizex - len(X))
+  print len(X)
 
   return X
 # ------------------------------------------------------------------------------
@@ -101,6 +108,9 @@ def window_avg(data_df, window_size):
   '''
   vals = data_df.values
   avg_vals = []
+
+  if window_size == 1:
+    return data_df
 
   i = 0
   k = 0
@@ -499,7 +509,7 @@ def regress_once(X, X_t, y, labels=None, o3_y=None, no2_pred=None,
     X_t = X
 
   X_ = X[perm, :]
-  X_t = X_t[perm, :train_size]
+  X_t = X_t[perm, :]
   y_ = y[perm]
 
   X_train = X_[:train_size, :]
@@ -508,19 +518,16 @@ def regress_once(X, X_t, y, labels=None, o3_y=None, no2_pred=None,
 
   if o3_y is not None:
     y_test = o3_y[perm][train_size:]
+    no2_pred = no2_pred[perm][train_size:]
   else:
     y_test = y_[train_size:]
-
-  if no2_pred is not None:
-    no2_pred = no2_pred[perm][train_size:]
 
   # train model
   reg = LinearRegression(fit_intercept=intercept).fit(X_train, y_train)
 
   # test model
   if labels is not None:
-    labels = labels[perm]
-    labels = labels[train_size:]
+    labels = labels[perm][train_size:]
     X_test = X_test[(labels != 0)]
     y_test = y_test[(labels != 0)]
     if no2_pred is not None:
@@ -545,8 +552,8 @@ def regress_once(X, X_t, y, labels=None, o3_y=None, no2_pred=None,
   metrics = get_metrics(y_test, pred)
   
   # training model
-  pred = reg.predict(X_train)
-  dev = stats.mae(y_train, pred)
+  #pred = reg.predict(X_train)
+  #dev = stats.mae(y_train, pred)
 
   coeffs = reg.coef_.tolist()
   coeffs.append(reg.intercept_)
@@ -602,42 +609,50 @@ def dtr_regress(X, X_t, y, labels=None, train_size=0.7,
     X_test = X_test[(labels != 0)]
     y_test = y_test[(labels != 0)]
 
-  metrics = []
+  metrics1 = []
+  metrics2 = []
   if optimize_depth:
 
     max_depths = np.arange(2, 20)
-    min_err = np.inf
-    min_mape = np.inf
+    min_err = np.zeros([2,])
+    min_err[0] = np.inf
+    min_err[1] = np.inf
     errs = np.zeros([np.size(max_depths), 2])
 
     for (i, depth) in enumerate(max_depths):
       # train model
       reg = DecisionTreeRegressor(criterion='mse',
-              max_depth=depth, min_samples_split=0.05)
+              max_depth=depth)
       reg.fit(X_train, y_train)
       pred = reg.predict(X_test)
 
       errs[i, 0] = stats.rmse(y_test, pred)
       errs[i, 1] = stats.mape(y_test, pred)
-
+      
       idx = 1 if consider_mape else 0
-      if errs[i, idx] < min_err:
-        metrics = get_metrics(y_test, pred)
-        min_err = errs[i, idx]
-        best_reg = reg
+      idx2 = 1-idx
+      if errs[i, idx] < min_err[idx]:
+        metrics1 = get_metrics(y_test, pred)
+        min_err[idx] = errs[i, idx]
+        best_reg1 = reg
+      if errs[i, idx2] < min_err[idx2]:
+        metrics2 = get_metrics(y_test, pred)
+        min_err[idx2] = errs[i, idx2]
+        best_reg2 = reg
 
     fig, ax = plotting.plot_xy(max_depths, errs,
             title=r'\textbf{Error vs. Decision tree depth',
             xlabel=r'\textit{Tree depth}',
             ylabel='', leg_labels=['RMSE', 'MAPE'])
 
+    fig.savefig('/media/srijith/Srijith/mriu-dtree/err-vs-depth/'+fname+'.svg', format='svg')
     #no2_figs.append(fig)
     #no2_fignames.append('rms-err-depth-dtr')
     #plt.show()
 
   else:
     best_reg = DecisionTreeRegressor(criterion='mse',
-              max_depth=None, min_samples_split=0.05)
+              max_depth=None)
     best_reg.fit(X_train, y_train)
     pred = best_reg.predict(X_test)
     metrics = get_metrics(y_test, pred)
@@ -647,12 +662,19 @@ def dtr_regress(X, X_t, y, labels=None, train_size=0.7,
     if fname is None:
       fname = "dtree.png"
 
-    export_graphviz(best_reg, out_file=dot_data, filled=True,
+    export_graphviz(best_reg1, out_file=dot_data, filled=True,
                     rounded=True, special_characters=True)
 
     graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
-    graph.write_png(fname)
+    graph.write_png(fname+'r.png')
+  
+    dot_data = StringIO()
+    export_graphviz(best_reg2, out_file=dot_data, filled=True,
+                    rounded=True, special_characters=True)
 
+    graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+    graph.write_png(fname+'m.png')
+  
   #fig = plotting.plot_err_dist(y_test, pred,
   #            title=r'\textbf{Percentage errors of concentration ranges}',
   #            xlabel=r'\textit{Reference concentration (p.p.b.)}')
@@ -664,7 +686,103 @@ def dtr_regress(X, X_t, y, labels=None, train_size=0.7,
   #  fig.savefig('/home/srijith/satvam/calib-data/inf/tmp/o3-mape-ranges-'+string+'.pdf',
   #            format='pdf')
 
-  return metrics
+  return metrics1, metrics2
+# ------------------------------------------------------------------------------
+def model_tree_regress(X, X_t, y, sensor_type='no2', labels=None,
+                       train_size=0.7, max_depth=4, min_samples_leaf=50):
+  '''
+     Use Model Tree Regression by Anson Wong to fit a linear
+     regression model over nodes of a decision tree
+  '''
+
+  train_size = int(np.floor(train_size * X.shape[0]))
+
+  perm = np.arange(X.shape[0])
+  perm = np.random.permutation(perm)
+  if X_t is None:
+    X_t = X
+
+  X_ = X[perm, :]
+  X_t = X_t[perm, :]
+  y_ = y[perm]
+
+  X_train = X_[:train_size, :]
+  y_train = y_[:train_size]
+  X_test = X_t[train_size:, :]
+
+  y_test = y_[train_size:]
+
+  # test model
+  if labels is not None:
+    labels = labels[perm]
+    labels = labels[train_size:]
+    X_test = X_test[(labels != 0)]
+    X_test2 = X_test[(labels == 0)]
+    y_test = y_test[(labels != 0)]
+
+  # try different parameters!
+  regr = linear_regr()
+  model_tree_regr = ModelTree(regr, max_depth=max_depth,
+                              search_type='adaptive',
+                              min_samples_leaf=min_samples_leaf)
+
+  model_tree_regr.fit(X_train, y_train)
+
+  pred = model_tree_regr.predict(X_test)
+  pred2 = model_tree_regr.predict(X_test2)
+  #nodes = []
+  #ranges = []
+  #vecs = []
+  #for (i, tup) in enumerate(pred):
+  #  node = tup[1]
+  #  if node in nodes:
+  #    j = nodes.index(node)
+  #    vecs[j].append(y[i])
+  #    if ranges[j][0] > y[i]:
+  #      ranges[j][0] = y[i]
+  #    if ranges[j][1] < y[i]:
+  #      ranges[j][1] = y[i]
+  #  else:
+  #    nodes.append(node)
+  #    vecs.append([y[i]])
+  #    ranges.append([y[i], y[i]])
+
+  #print nodes
+  #print np.array(ranges)
+
+  #print vecs
+  #fig1 = plt.figure()
+  #ax1 = fig1.add_subplot('111')
+
+  #ax1.set_title(r'\textbf{Ranges of Reference concentration for leaf nodes of Model Tree}')
+  #ax1.set_xlabel(r'\textit{Leaf nodes of Model Tree}')
+  #ax1.set_ylabel(r'\textit{Reference conc. (ppb)')
+
+  #ax1.yaxis.grid(b=True, which='major', linestyle='-', alpha=0.8)
+  #ax1.xaxis.grid(b=True, which='major', linestyle='-', alpha=0.8)
+  #ax1.yaxis.grid(b=True, which='minor', linestyle=':', alpha=0.5)
+  #ax1.xaxis.grid(b=True, which='minor', linestyle=':', alpha=0.5)
+
+  #medians = [np.median(vec) for vec in vecs]
+  #ax1.boxplot(vecs, positions=medians)
+  #ax1.set_xticklabels(['%0.1f'%x for x in medians], rotation='80')
+  #fig1.savefig('/media/srijith/Srijith/mriu-dtree/modeltree-depth2/true-ranges-sens1-%s.pdf'%sensor_type, format='pdf')
+
+  # plot of mean errors vs reference conc.
+  #fig2 = plotting.plot_err_dist(y, [p[0] for p in pred],
+  #            title=r'\textbf{Percentage errors of concentration ranges}',
+  #            xlabel=r'\textit{Reference concentration (p.p.b.)}')
+
+  #fig2.savefig('/media/srijith/Srijith/mriu-dtree/modeltree-depth3-samples150/mape-dist_sens1-%s.pdf'%sensor_type, format='pdf')
+
+  #features = ['no2_op1', 'no2_op2', 'o3_op1', 'o3_op2'] \
+  #                if (sensor_type == 'no2') else        \
+  #           ['o3_op1', 'o3_op2', 'no2_op1', 'no2_op2']
+
+  #model_tree_regr.export_graphviz('/media/srijith/Srijith/mriu-dtree/modeltree-depth3-samples150/modeltree_graph_%s_sens1' % sensor_type,
+  #                                features, export_png=False, export_pdf=True)
+
+  return get_metrics(y_test, pred), get_metrics(y_test2, pred2)
 # ------------------------------------------------------------------------------
 def tls_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
   '''
@@ -774,6 +892,65 @@ def rfr_regress_once(X, y, labels=None, train_size=0.7, intercept=True):
 
   return metrics
 # ------------------------------------------------------------------------------
+def get_agg_sets(X, y, for_sens, n_pred=None, o3_y=None):
+  '''
+    Get a merged dataset containing all the matrices in X,
+    and the corresponding output vector y, repeated.
+    [assumption] - y is the same for all X's.
+    
+    Params:
+      X     -   list of dataset matrices, size of each element
+                is [num_examples, num_features]
+      y     -   output vector of size [num_examples,]
+      for_sens -  index of specific data to mark in labels
+      n_pred  - [default None] prediction from NO2 sensors,
+                length same as list length of X
+      o3_y  - [default None] list of o3 reference values
+
+    Returns:
+      agg_X  - Aggregated data-set
+      agg_y  - repeated output vector to match agg_X
+      labels - Labels denoting locations of for_sens sensor
+      agg_np - Aggregate no2_prediction
+      agg_oy - aggregate o3_y vector after tiling appropriately
+  '''
+
+  agg_X = []
+  agg_y = np.array([])
+
+  if o3_y is not None:
+    agg_oy = np.array([])
+    agg_np = np.array([])
+    assert len(o3_y) == len(n_pred)
+  else:
+    agg_oy = None
+    agg_np = None
+
+  labels = np.zeros([len(X) * np.shape(X[0])[0],])
+  for (k, X_sensor) in enumerate(X):
+
+    if k == 0:
+      agg_X[:] = X_sensor 
+    else:
+      agg_X = np.concatenate((agg_X, X_sensor), axis=0)
+
+    agg_y = np.concatenate((agg_y, y), axis=0)
+
+    if o3_y is not None:
+      agg_oy = np.concatenate((agg_oy, o3_y), axis=0)
+      agg_np = np.concatenate((agg_np, n_pred), axis=0)
+
+    if k == for_sens:
+      labels[k * np.shape(X[0])[0] : (k+1) * np.shape(X[0])[0]] = 1
+
+  assert len(labels) == len(agg_y)
+  if agg_np is not None:
+    assert len(agg_np) == len(agg_oy)
+    assert len(agg_np) == len(labels)
+
+  return agg_X, agg_y, labels, agg_np, agg_oy
+
+# ------------------------------------------------------------------------------
 def regress_sensor_type(X, y, sensor, epochs, train_ratio,
                         runs, reg='', no2_pred=None, o3_y=None):
   '''
@@ -802,29 +979,83 @@ def regress_sensor_type(X, y, sensor, epochs, train_ratio,
       maes, rmses and mapes have shape [num_sensors, runs, (num_sensors + 1)]
   '''
 
-  #if sensor == 'ox' and (no2_pred is None or o3_y is None):
-  #  raise ValueError("OX sensor regression: either NO2 prediction\
-  #           or O3 output not specified")
-  #elif sensor == 'no2':
-  #  no2_pred = None
-  #  o3_y = None
+  if sensor == 'ox' and (no2_pred is None or o3_y is None):
+    raise ValueError("OX sensor regression: either NO2 prediction\
+             or O3 output not specified")
+  elif sensor == 'no2':
+    no2_pred = None
+    o3_y = None
 
   # coefficients for all steps carried out
   # shape: N * R * (N + 1) * m
-  coeffs = np.zeros([len(X), runs, (len(X) + 1), (1+np.shape(X[0])[1])])
+  regress_sensor_type.coeffs = \
+      np.zeros([len(X), runs, (len(X) + 1), (1+np.shape(X[0])[1])])
 
   # error metrics
   # shape: N * R * (N + 1)
-  maes = np.zeros([len(X), runs, (len(X) + 1)])
-  rmses = np.zeros([len(X), runs, (len(X) + 1)]) 
-  mapes = np.zeros([len(X), runs, (len(X) + 1)]) 
-  r2 = np.zeros([len(X), runs, (len(X) + 1)]) 
-  r = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.maes = np.zeros([len(X), runs, (len(X) + 1)])
+  regress_sensor_type.rmses = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.mapes = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.r2 = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.r = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.mean = np.zeros([len(X), runs, (len(X) + 1)]) 
+  regress_sensor_type.std = np.zeros([len(X), runs, (len(X) + 1)]) 
 
-  mean = np.zeros([len(X), runs, (len(X) + 1)]) 
-  std = np.zeros([len(X), runs, (len(X) + 1)]) 
+  def _reg_metrics(X, X_test, y, pos, n_pred=None,
+                   oy=None, lab=None, string=''):
+    '''
+      Regress and fill metrics and coeffs (if applicable)
+    '''
+
+    if reg == 'tls':
+      tmpcoeffs, metrics = tls_regress_once(X, X_test, y,
+                         train_size=train_ratio)
+
+    elif reg == 'rfr':
+      metrics = rfr_regress_once(X, X_test, y,
+                         train_size=train_ratio)
+      tmpcoeffs = None
+
+    elif reg == 'mtr':
+      metrics = model_tree_regress(X, X_test, y,
+                        train_size=train_ratio, labels=lab)
+      tmpcoeffs = None
+
+    else:
+      if sensor == 'ox':
+        tmpcoeffs, metrics = regress_once(X, X_test, y,
+                              train_size=train_ratio,
+                              no2_pred=n_pred, o3_y=oy,
+                              labels=lab, string=string)
+      else:
+        tmpcoeffs, metrics = regress_once(X, X_test, y,
+                              train_size=train_ratio,
+                              labels=lab, string=string)
+
+    if tmpcoeffs is not None:
+      regress_sensor_type.coeffs[pos[0], pos[1], pos[2], :] = tmpcoeffs
+    else:
+      regress_sensor_type.coeffs = None
+
+    regress_sensor_type.maes[pos[0], pos[1], pos[2]] = metrics[0]
+    regress_sensor_type.rmses[pos[0], pos[1], pos[2]] = metrics[1]
+    regress_sensor_type.mapes[pos[0], pos[1], pos[2]] = metrics[2]
+    regress_sensor_type.r2[pos[0], pos[1], pos[2]] = metrics[3]
+    regress_sensor_type.r[pos[0], pos[1], pos[2]] = metrics[4]
+    regress_sensor_type.mean[pos[0], pos[1], pos[2]] = metrics[5]
+    regress_sensor_type.std[pos[0], pos[1], pos[2]] = metrics[6]
+
+    return
+
   for j in xrange(len(X)):
-
+    # build aggregate dataset
+    if no2_pred is not None:
+      agg_X, agg_y, labels, agg_np, agg_oy = \
+                get_agg_sets(X, y, j, no2_pred[j][-1, :], o3_y)
+    else:
+      agg_X, agg_y, labels, agg_np, agg_oy = \
+                get_agg_sets(X, y, j, n_pred=None, o3_y=None)
+      
     print "Sensor: " + str(j + 1)
     for i in xrange(runs):
 
@@ -832,87 +1063,27 @@ def regress_sensor_type(X, y, sensor, epochs, train_ratio,
                             % ((i+1), (i+1) * 100/runs))
       for k in xrange(len(X)):
 
-        string = 'tr%dte%d' % (k+1, j+1)
         # Train on sensor k
-        if reg == 'tls':
-          tmpcoeffs, metrics = tls_regress_once(X[k], X[j], y, train_size=train_ratio)
-
-        elif reg == 'rfr':
-          metrics = rfr_regress_once(X[k], X[j], y, train_size=train_ratio)
-          tmpcoeffs = None
-
+        string = 'tr%dte%d' % (k+1, j+1)
+        if no2_pred is not None:
+          _reg_metrics(X[k], X[j], y, (j, i, k),
+                       n_pred=no2_pred[j][k, :], oy=o3_y,
+                       string=string)
         else:
-          if sensor == 'ox':
-            tmpcoeffs, metrics = regress_once(X[k], X[j], y, train_size=train_ratio,
-                                            no2_pred=no2_pred[j][k, :],
-                                            o3_y=o3_y, string=string)
-          else:
-            tmpcoeffs, metrics = regress_once(X[k], X[j], y, train_size=train_ratio,
-                                              string=string)
-        coeffs[j, i, k][:] = tmpcoeffs
-        maes[j, i, k] = metrics[0]
-        rmses[j, i, k] = metrics[1]
-        mapes[j, i, k] = metrics[2]
-        r2[j, i, k] = metrics[3]
-        r[j, i, k] = metrics[4]
-
-        mean[j, i, k] = metrics[5]
-        std[j, i, k] = metrics[6]
-
-      # build aggregate dataset
-      agg_X = []
-      agg_y = np.array([])
-      if sensor == 'ox':
-        agg_oy = np.array([])
-        agg_np = np.array([])
-
-      labels = np.zeros([len(X) * np.shape(X[0])[0],])
-      for (k, X_sensor) in enumerate(X):
-
-        agg_y = np.concatenate((agg_y, y), axis=0)
-        if sensor == 'ox':
-          agg_oy = np.concatenate((agg_oy, o3_y), axis=0)
-          agg_np = np.concatenate((agg_np, no2_pred[j][-1,:]), axis=0)
-
-        if k == 0:
-          agg_X = X_sensor
-        else:
-          agg_X = np.concatenate((agg_X, X_sensor), axis=0)
-
-        if k == j:
-          labels[k * np.shape(X[0])[0] : (k+1) * np.shape(X[0])[0]] = 1
+          _reg_metrics(X[k], X[j], y, (j, i, k), string=string)
 
       # train on aggregate dataset
       string = 'trALLte%d' % (j+1)
-      if sensor == 'ox':
-        tmpcoeffs, metrics = regress_once(agg_X, None, agg_y, train_size=train_ratio,
-                                        labels=labels, no2_pred=agg_np,
-                                        o3_y=agg_oy, string=string)
-      else:
-        tmpcoeffs, metrics = regress_once(agg_X, None, agg_y,
-                    labels=labels, train_size=train_ratio, string=string)
-      coeffs[j, i, -1][:] = tmpcoeffs
-      maes[j, i, -1] = metrics[0]
-      rmses[j, i, -1] = metrics[1]
-      mapes[j, i, -1] = metrics[2]
-      r2[j, i, -1] = metrics[3]
-      r[j, i, -1] = metrics[4]
-
-      mean[j, i, -1] = metrics[5]
-      std[j, i, -1] = metrics[6]
+      _reg_metrics(agg_X, None, agg_y, (j, i, -1),
+                   n_pred=agg_np, oy=agg_oy,
+                   lab=labels, string=string)
 
     print "\nSensor %d DONE" % (j+1)
 
-  # tmp: for getting mean and std
-  mean = np.mean(mean, axis=1)
-  std = np.mean(std, axis=1)
-
-  print mean
-  print std
-
-  #return None, maes, rmses, mapes, r2, r, mean, std
-  return coeffs, maes, rmses, mapes, r2, r, mean, std
-
+  return regress_sensor_type.coeffs, regress_sensor_type.maes, \
+         regress_sensor_type.rmses, regress_sensor_type.mapes, \
+         regress_sensor_type.r2, regress_sensor_type.r, \
+         regress_sensor_type.mean, regress_sensor_type.std
 # ------------------------------------------------------------------------------
 def preproc(data, temps_present, hum_present, incl_op1, incl_op2,
             incl_temps, incl_op1t, incl_op2t, incl_hum, incl_op1h, incl_op2h,
@@ -1135,14 +1306,14 @@ def regress_df(data, temps_present=False, hum_present=False,
     o3_metrics = []
 
     for (i, x) in enumerate(no2_x):
-      no2_metrics.append(dtr_regress(x, None, no2_y,
+      no2_metrics.append(dtr_regress(x, None, y,
                                      train_size=training_set_ratio,
                                      viz_tree=True,
-                                     fname='n-tree%d.png'%i,
+                                     fname='n-tree%d.png'%1,
                                      optimize_depth=True,
                                      consider_mape=True))
     for (i, x) in enumerate(ox_x):
-      o3_metrics.append(dtr_regress(x, None, o3_y,
+      o3_metrics.append(dtr_regress(x, None, y,
                                    train_size=training_set_ratio,
                                    viz_tree=True,
                                    fname='o-tree%d.png'%i,
@@ -1151,6 +1322,27 @@ def regress_df(data, temps_present=False, hum_present=False,
 
     print no2_metrics
     print o3_metrics
+
+  #elif CONF_REG == 'mtr':
+  #  no2_metrics = []
+  #  o3_metrics = []
+
+  #  #for (i, x) in enumerate(no2_x):
+  #  #x, y, lab, d2, d3 = get_agg_sets(no2_x, no2_y, 1)
+  #  no2_metrics.append(model_tree_regress(no2_x[0], None, no2_y,
+  #                                     #labels=lab,
+  #                                     train_size=training_set_ratio,
+  #                                     sensor_type='no2'))
+
+  #  #for (i, x) in enumerate(ox_x):
+  #  #x, y, lab, d2, d3 = get_agg_sets(ox_x, o3_y, 1)
+  #  o3_metrics.append(model_tree_regress(ox_x[0], None, o3_y,
+  #                                     #labels=lab,
+  #                                     train_size=training_set_ratio,
+  #                                     sensor_type='o3'))
+
+  #  print no2_metrics
+  #  print o3_metrics
 
   else:
     # always train no2 before o3
@@ -1161,75 +1353,87 @@ def regress_df(data, temps_present=False, hum_present=False,
           runs, CONF_REG)
 
     # store no2 coefficients
-    no2_pred = []
-    for x in no2_x:
-      x = np.concatenate((x, np.ones([x.shape[0],1])), axis=1)
-      mean_coeffs_no2 = np.mean(coeffs_no2, axis=0)
-      mean_coeffs_no2 = np.mean(mean_coeffs_no2, axis=0)
-      #print mean_coeffs_no2
-      no2_pred.append(np.dot(mean_coeffs_no2, x.T))    # shape: (num_sens + 1, data_len)
+    #no2_pred = []
+    #for x in no2_x:
+    #  x = np.concatenate((x, np.ones([x.shape[0],1])), axis=1)
+    #  mean_coeffs_no2 = np.median(coeffs_no2, axis=0)
+    #  mean_coeffs_no2 = np.median(mean_coeffs_no2, axis=0)
+    #  #print mean_coeffs_no2
+    #  no2_pred.append(np.dot(mean_coeffs_no2, x.T))    # shape: (num_sens + 1, data_len)
 
     print "\nFor OX sensors....."
     coeffs_ox, maes_ox, rmses_ox, mapes_ox, r2_ox, r_ox,\
     means_ox, stds_ox = regress_sensor_type(
-          ox_x, o3_y, 'ox', epochs, training_set_ratio,
-          runs, CONF_REG, no2_pred=no2_pred, o3_y=o3_y)
+          ox_x, o3_y, 'no2', epochs, training_set_ratio,
+          runs, CONF_REG)#, no2_pred=no2_pred, o3_y=o3_y)
 
     # mean coefficients should have the shape (N+1) * m
-    mean_no2_coeffs = np.mean(coeffs_no2, axis=(0, 1))
-    mean_ox_coeffs = np.mean(coeffs_ox, axis=(0, 1))
+    #mean_no2_coeffs = np.median(coeffs_no2, axis=(0, 1))
+    #mean_ox_coeffs = np.median(coeffs_ox, axis=(0, 1))
 
     # plot violins for error metrics
-    plot_error_violins(maes_no2, name='MAE',
-          full_name='Mean Absolute Error', sens_type='NO_2');
-    plot_error_violins(rmses_no2, name='RMSE',
-          full_name='Root Mean Square Error', sens_type='NO_2');
-    plot_error_violins(mapes_no2, name='MAPE',
-          full_name='Mean Absolute Percentage Error', sens_type='NO_2');
-
-    plot_error_violins(maes_ox, name='MAE',
-          full_name='Mean Absolute Error', sens_type='O_X');
-    plot_error_violins(rmses_ox, name='RMSE',
-          full_name='Root Mean Square Error', sens_type='O_X');
-    plot_error_violins(mapes_ox, name='MAPE',
-          full_name='Mean Absolute Percentage Error', sens_type='O_X');
-
+    #plot_error_violins(maes_no2, name='MAE',
+    #      full_name='Mean Absolute Error', sens_type='NO_2');
+    #plot_error_violins(rmses_no2, name='RMSE',
+    #      full_name='Root Mean Square Error', sens_type='NO_2');
+    #plot_error_violins(mapes_no2, name='MAPE',
+    #      full_name='Mean Absolute Percentage Error', sens_type='NO_2');
+    #
+    #plot_error_violins(maes_ox, name='MAE',
+    #      full_name='Mean Absolute Error', sens_type='O_X');
+    #plot_error_violins(rmses_ox, name='RMSE',
+    #      full_name='Root Mean Square Error', sens_type='O_X');
+    #plot_error_violins(mapes_ox, name='MAPE',
+    #      full_name='Mean Absolute Percentage Error', sens_type='O_X');
+    #
     # ravel the first two dimensions
-    coeffs_no2 = np.reshape(coeffs_no2,
-          [coeffs_no2.shape[0] * coeffs_no2.shape[1],
-           coeffs_no2.shape[2],
-           coeffs_no2.shape[3]])
-
-    coeffs_ox = np.reshape(coeffs_ox,
-          [coeffs_ox.shape[0] * coeffs_ox.shape[1],
-           coeffs_ox.shape[2],
-           coeffs_ox.shape[3]])
-    
-    print coeffs_no2_names
-    print coeffs_ox_names
-
-    # plot violins for coefficients
-    plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
-    plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
+    #coeffs_no2 = np.reshape(coeffs_no2,
+    #      [coeffs_no2.shape[0] * coeffs_no2.shape[1],
+    #       coeffs_no2.shape[2],
+    #       coeffs_no2.shape[3]])
+#
+#    coeffs_ox = np.reshape(coeffs_ox,
+#          [coeffs_ox.shape[0] * coeffs_ox.shape[1],
+#           coeffs_ox.shape[2],
+#           coeffs_ox.shape[3]])
+#    
+#    print coeffs_no2_names
+#    print coeffs_ox_names
+#
+#    # plot violins for coefficients
+#    plot_coeff_violins(coeffs_no2, names=coeffs_no2_names, sens_type='NO_2')
+#    plot_coeff_violins(coeffs_ox, names=coeffs_ox_names, sens_type='O_3')
 
   # find p_vals of features
-  if save_fscores:
-    for (i, x) in enumerate(no2_x):
-      x = normalize(x, axis=0)
-      f, p = f_regression(x, no2_y)
-      f = np.concatenate((f, p), axis=1)
-      np.savetxt(DIR_PREFIX + ("fscores-no2-sens%d" % (i+1)),
-                 f, fmt='%0.4e', delimiter=',')
-
-    for (i, x) in enumerate(o3_x):
-      x = normalize(x, axis=0)
-      f, p = f_regression(x, ox_y)
-      f = np.concatenate((f, p), axis=1)
-      np.savetxt(DIR_PREFIX + ("fscores-ox-sens%d" % (i+1)),
-                 f, fmt='%0.4e', delimiter=',')
+#  if save_fscores:
+#    for (i, x) in enumerate(no2_x):
+#      x = normalize(x, axis=0)
+#      f, p = f_regression(x, no2_y)
+#      f = np.concatenate((f, p), axis=1)
+#      np.savetxt(DIR_PREFIX + ("fscores-no2-sens%d" % (i+1)),
+#                 f, fmt='%0.4e', delimiter=',')
+#
+#    for (i, x) in enumerate(o3_x):
+#      x = normalize(x, axis=0)
+#      f, p = f_regression(x, ox_y)
+#      f = np.concatenate((f, p), axis=1)
+#      np.savetxt(DIR_PREFIX + ("fscores-ox-sens%d" % (i+1)),
+#                 f, fmt='%0.4e', delimiter=',')
 
   # if needed in future....
   #mi = mutual_info_regression(x, no2_y)
+
+  print np.median(maes_no2, axis=1)
+  print np.median(rmses_no2, axis=1)
+  print np.median(mapes_no2, axis=1)
+  print np.median(r2_no2, axis=1)
+  print np.median(r_no2, axis=1)
+
+  print np.median(maes_ox, axis=1)
+  print np.median(rmses_ox, axis=1)
+  print np.median(mapes_ox, axis=1)
+  print np.median(r2_ox, axis=1)
+  print np.median(r_ox, axis=1)
 
   if ret_errs:
     return coeffs_no2, coeffs_ox, maes_no2, maes_ox, rmses_no2,\
@@ -1237,6 +1441,228 @@ def regress_df(data, temps_present=False, hum_present=False,
            means_no2, means_ox, stds_no2, stds_ox
   else:
     return no2_figs, no2_fignames, o3_figs, o3_fignames
+
+# ----------------------------------------------------------------------------------
+def gen_global_err_set(dfs, grans=[1, 15, 60], runs=200, err_func=stats.mape):
+  '''
+    Generate a 7D numpy array of the shape
+    [Loc x Gran x model x runs x senstype x test-set x metrics]
+
+    dfs: list of dataframes
+    runs: number of runs
+    err_func: function used for error computation
+
+  '''
+
+  sens_types = ['no2', 'o3']
+
+  terms_incl = [[False, False],
+                [True, False],
+                [False, True],
+                [True, True]]
+
+  tree_params = [(2, 50),
+                 (3, 50),
+                 (3, 150),
+                 (4, 50)]
+
+  # need to change the 12 and the 4 in future iterations
+  errs = np.zeros([len(dfs), len(grans), 12, runs, len(sens_types), 4, 4])
+
+  def _run_iters(X, y, reg_func, loc, **kwargs):
+
+    def _run_reg(X, y, **kwargs):
+      ret = reg_func(X, None, y, **kwargs)
+      if isinstance(ret, tuple):
+        metrics = ret[-1]
+      else:
+        metrics = ret
+      return metrics[:4]
+
+    for run in xrange(runs):
+      for l, X_ in enumerate(X):
+        errs[loc[0], loc[1], loc[2], run, loc[3], l, :] = _run_reg(X_, y, **kwargs)
+
+      for l in xrange(len(X)):
+        agg_X, agg_y, labels, dummy1, dummy2 = get_agg_sets(X, y, l)
+        kwargs['labels'] = labels
+        errs[loc[0], loc[1], loc[2], run, loc[3], l+2, :] =\
+                   _run_reg(agg_X, agg_y, **kwargs)
+
+
+  # alphasense values do not train on aggregate models
+  errs[:, :, :4, :, :, 2:] = np.inf
+
+  for (i, df) in enumerate(dfs):
+    if i == 1:
+      grans_ = [60]
+    else:
+      grans_ = grans
+    for (j, gran) in enumerate(grans_):
+      # average data
+      df = window_avg(df, gran).dropna()
+
+      # errors for alphasense models index 0 to 3
+      print "For alphasense: (granularity = %dmins)" % gran
+      for run in xrange(runs):
+
+        vals = df.values
+        vals = np.random.permutation(vals)[:30]
+        err_no2, err_o3 = alp.alphasense_compute(vals, True, True)
+
+        errs[i, j, :4, run, 0, :2, :] = np.swapaxes(err_no2[:, :, :4], 0, 1)
+        errs[i, j, :4, run, 1, :2, :] = np.swapaxes(err_o3[:, :, :4], 0, 1)
+      
+      # errors for different linear models
+      #print "For linear models: (granularity = %dmins)" % gran
+      #for k, term in enumerate(terms_incl):
+      #  epochs, no2_x, no2_y, ox_x, o3_y, ox_y, coeffs_no2_names,\
+      #  coeffs_ox_names = preproc(df, temps_present=True, hum_present=True,
+      #        incl_op1=True, incl_op2=True, incl_temps=term[0], incl_op1t=False,
+      #        incl_op2t=False, incl_hum=term[0], incl_op1h=False, incl_op2h=False,
+      #        incl_op12=False, incl_cross_terms=term[1], clean=3,
+      #        runs=200, loc_label='', training_set_ratio=0.7)
+#
+#        _run_iters(no2_x, no2_y, regress_once, (i, j, k+4, 0))
+#        _run_iters(ox_x, o3_y, regress_once, (i, j, k+4, 1))
+
+      # errors for model trees
+      #print "For model trees: (granularity = %dmins)" % gran
+      #epochs, no2_x, no2_y, ox_x, o3_y, ox_y, coeffs_no2_names,\
+      #coeffs_ox_names = preproc(df, temps_present=True, hum_present=True,
+      #      incl_op1=True, incl_op2=True, incl_temps=False, incl_op1t=False,
+      #      incl_op2t=False, incl_hum=False, incl_op1h=False, incl_op2h=False,
+      #      incl_op12=False, incl_cross_terms=True, clean=3,
+      #      runs=200, loc_label='', training_set_ratio=0.7)
+#
+#      for k, param in enumerate(tree_params):
+#        print "\tFor tree: ", param
+#        _run_iters(no2_x, no2_y, model_tree_regress, (i, j, k+8, 0),
+#                   max_depth=param[0], min_samples_leaf=param[1])
+#        _run_iters(ox_x, o3_y, model_tree_regress, (i, j, k+8, 1),
+#                   max_depth=param[0], min_samples_leaf=param[1])
+#
+  np.save('global_errs_corr_as.npy', errs)
+  return errs
+  
+# ----------------------------------------------------------------------------------
+def mape_plots_vec(err_vec):
+  '''
+    Get MAPE error plots for SATVAM eScience 2019 paper from DataFrame
+
+    err_vec: of shape [Loc x Gran x model x runs x senstype x test-set x metrics]
+  '''
+
+  ID_LOC = 0
+  ID_GRAN = 1
+  ID_METRIC = 2  # 0:mae, 1:rmse, 2:mape, 3:r2
+
+  MOD_BEST = [0, 6, 10]
+
+  ret_figs = []
+  ret_names = []
+
+  for i in xrange(err_vec.shape[4]):
+    print "\n Sensor type %d" % i
+    for j in range(2, err_vec.shape[5]):
+
+      if i == 1 and j == 2:
+        scale = [0, 200]
+        leg = True
+      else:
+        if i == 1:
+          scale = [0, 200]
+        else:
+          scale = [0, 150]
+        leg = False
+
+      '''
+      print "\n Test set: %d" % j
+      print "Effect of models...."
+      # effect of models
+      mapes = err_vec[ID_LOC, ID_GRAN, :, :, i, j, ID_METRIC].T
+      print mapes.shape
+      fig, ax = plotting.plot_violin(mapes,
+                  #title=r'\textit{Effect of models on MAPE}',
+                  xlabel='', ylabel=r'$ MAPE (\%) $',
+                  x_tick_labels=[['A1', 'A2', 'A3', 'A4'],
+                                 ['L1', 'L2', 'L3', 'L4'],
+                                 ['R1', 'R2', 'R3', 'R4']],
+                  groups = [4, 4, 4], scale=[0, 100], leg=leg,
+                  group_labels=['AlphaSense', 'Lin Regr', 'Regr Tree'])
+
+      ret_figs.append(fig)
+      ret_names.append('violins_effmodels_type%d_set%d' % (i ,j))
+
+      print "Effect of granularity...."
+      # effect of granularity
+      mapes = err_vec[ID_LOC, :, MOD_BEST, :, i, j, ID_METRIC]  # M x G x R
+      mapes = np.swapaxes(mapes, 0, 1)
+      print mapes.shape
+      mapes = np.reshape(mapes, [mapes.shape[0] *
+                                 mapes.shape[1], mapes.shape[2]], order='F').T
+
+      fig, ax = plotting.plot_violin(mapes,
+                  #title=r'\textit{Effect of granularity on MAPE}',
+                  xlabel='', ylabel=r'$ MAPE (\%) $',
+                  x_tick_labels=['1', '15', '60'],
+                  groups = [3, 3, 3], scale=scale,
+                  group_labels=['A1', 'L3',
+                                r'R3'], leg=leg,
+                  mark_maxoutliers=False)
+
+      ret_figs.append(fig)
+      ret_names.append('violins_effgrans_type%d_set%d' % (i ,j))
+
+      #if i != 1 or j != 3:
+      #  continue
+        
+      print "Effect of location...."
+      # effect of location
+      mapes = err_vec[:, 2, MOD_BEST, :, i, j, ID_METRIC]  # M x L x R
+      mapes = np.swapaxes(mapes, 0, 1)
+      print mapes.shape
+      mapes = np.reshape(mapes, [mapes.shape[0] *
+                                 mapes.shape[1], mapes.shape[2]], order='F').T
+
+      fig, ax = plotting.plot_violin(mapes,
+                  #title=r'\textit{Effect of location on MAPE}',
+                  xlabel='', ylabel=r'$ MAPE (\%) $',
+                  x_tick_labels=['DEL', 'MUM'],
+                  groups = [2, 2, 2], scale=[0, 200],
+                  group_labels=['A1', 'L3',
+                                r'R3'], leg=leg)
+
+      ret_figs.append(fig)
+      ret_names.append('violins_effloc_type%d_set%d' % (i, j))
+    '''
+  
+    print "Effect of sensors...."
+    # effect of sensors
+    mapes = err_vec[ID_LOC, ID_GRAN, MOD_BEST, :, i, :, ID_METRIC] # M x R x T
+    mapes = np.swapaxes(mapes, 1, 2)
+    mapes = np.swapaxes(mapes, 0, 1)
+    print mapes.shape
+    mapes = np.reshape(mapes, [mapes.shape[0] *
+                               mapes.shape[1], mapes.shape[2]], order='F').T
+
+    if i == 1:
+      scale = [0, 200]
+    else:
+      scale = [0, 110]
+
+    fig, ax = plotting.plot_violin(mapes,
+                  #title=r'\textit{Effect of sensors on MAPE}',
+                  xlabel='', ylabel=r'$ MAPE (\%) $',
+                  x_tick_labels=['1:1', '2:2', 'X:1', 'X:2'],
+                  groups = [4, 4, 4], scale=scale,
+                  group_labels=['AlphaSense A1', 'Lin Regr. L3',
+                                r'Regr Tree R3'], leg=False, mark_maxoutliers=False)
+
+    ret_figs.append(fig)
+    ret_names.append('violins_effsens_type%d' % i)
+
+  return ret_figs, ret_names
 
 # ----------------------------------------------------------------------------------
 def pm_correlate(data, ref_pm1_incl=False, ref_pm10_incl=False, loc_label='---'):

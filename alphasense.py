@@ -84,7 +84,7 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
     col_no2 = (lambda i: range((col_skip + 4*i),(col_skip + 4*i + 2)))
     col_ox = (lambda i: range((col_skip + 4*i + 2),(col_skip + 4*i + 4)))
 
-  dataFrame = dataFrame.values
+  #dataFrame = dataFrame.values
   err_no2 = np.zeros([len(NO2_WE_0T), 4, 5])
   err_o3 = np.zeros([len(NO2_WE_0T), 4, 5])
 
@@ -192,6 +192,7 @@ def alphasense_compute(dataFrame, t_incl=False, h_incl=False):
   #np.savetxt("alpha-no2-err2.csv", err_no2[1].T, fmt='%0.4g', delimiter=',')
   #np.savetxt("alpha-o3-err1.csv", err_o3[0].T, fmt='%0.4g', delimiter=',')
   #np.savetxt("alpha-o3-err2.csv", err_o3[1].T, fmt='%0.4g', delimiter=',')
-  print err_no2
-  print err_o3
+  #print err_no2
+  #print err_o3
+  return err_no2, err_o3
 # ------------------------------------------------------------------------------

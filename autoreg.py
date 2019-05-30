@@ -31,13 +31,14 @@ import plotting
 # -------------------------------------------------------------------------------
 # Change this field to 'MPCB' or 'MRIU' based on deployment site
 PARSE_TEMP_REF = True
-DEPLOY_SITE = 'MRIU'
+DEPLOY_SITE = 'MPCB'
 DEPLOYMENT = 2
-CONF_AVG_WINDOW_SIZE_MIN = 1
 CONF_PM_PLOTS = False
+CONF_AVG_WINDOW_SIZE_MIN = 60
 CONF_CLEAN = 3
-CONF_RUNS = 10
+CONF_RUNS = 50
 CONF_TEMP_HUM_FILE = 'ref'            # either 'ref' or 'satvam'
+CONF_SAVE_DATAFILE = True
 
 DEPLOY_SITE = DEPLOY_SITE.upper()
 
@@ -507,29 +508,33 @@ for i in xrange(NUM_SENSORS):
   aggregate_list.append(ox_op1[:, i].tolist())
   aggregate_list.append(ox_op2[:, i].tolist())
 
-aggregate_list = np.array(aggregate_list)
-if DEPLOYMENT != 1:
-  aggregate_list_2 = np.zeros(aggregate_list.shape)
-  aggregate_list_2[:] = aggregate_list
-  for i in xrange(NUM_SENSORS):
-    aggregate_list_2[3 + i * 6, :] = sens_t[:, i]
-    aggregate_list_2[4 + i * 6, :] = sens_h[:, i]
+#aggregate_list = np.array(aggregate_list)
+#if DEPLOYMENT != 1:
+#  aggregate_list_2 = np.zeros(aggregate_list.shape)
+#  aggregate_list_2[:] = aggregate_list
+#  for i in xrange(NUM_SENSORS):
+#    aggregate_list_2[3 + i * 6, :] = sens_t[:, i]
+#    aggregate_list_2[4 + i * 6, :] = sens_h[:, i]
 # -------------------------------------------------------------------------------
 target_df = pd.DataFrame(aggregate_list).transpose()
-target_df = regress.preclean_df(target_df, cols=[1, 2, 5, 6, 7, 8,
-                                                 11, 12, 13, 14])
+target_df = regress.preclean_df(target_df)#, cols=[1, 2, 5, 6, 7, 8, 11, 12, 13, 14])
 target_df = regress.window_avg(target_df, CONF_AVG_WINDOW_SIZE_MIN)
 target_df = target_df.dropna()
+
+if CONF_SAVE_DATAFILE:
+  target_df.to_csv("processed_data_mpcb.csv", header=None, index=None)
+  #exit()
+
 dataset_size = len(target_df.index)
 print "Data set size (after dropna()): " + str(dataset_size)
 # -------------------------------------------------------------------------------
 print "Calling regression algorithm on obtained DataFrame"
 
-if DEPLOYMENT != 1:
-  target_df2 = pd.DataFrame(aggregate_list_2).transpose()
-  target_df2 = target_df2.dropna()
-
-target_dfs = [target_df, target_df2]
+#if DEPLOYMENT != 1:
+#  target_df2 = pd.DataFrame(aggregate_list_2).transpose()
+#  target_df2 = target_df2.dropna()
+#
+#target_dfs = [target_df, target_df2]
 
 # free some memory
 #del ref_no2, ref_o3, temp, hum, no2_op1, no2_op2, ox_op1, ox_op2
@@ -645,10 +650,10 @@ no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
 #xlabs = []
 #for i in xrange(len(avg_duration)):
 #  df = regress.window_avg(target_df, avg_duration[i])
-#  df = target_df.dropna()
+#  df = df.dropna()
 #  for j in xrange(len(vars_vector)):
 #    print ("Avg duration: %d, Vars enabled: " % avg_duration[i])\
-#            + str(var_names[vars_vector[j]])
+#            + str(var_names[vars_vector[j]]) + (", Samples: %d" % len(df.index))
 #
 #    coeffs_nt, coeffs_ot, maes_no2_t, maes_o3_t, rmses_no2_t, rmses_o3_t,\
 #    mapes_no2_t, mapes_o3_t, r2_no2_t, r2_o3_t, r_no2_t, r_o3_t,\
@@ -718,35 +723,35 @@ no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
 #for i in xrange(np.shape(r_n)[0]):
 #  if coeffs_n is not None:
 #    vec = coeffs_n[i]
-#    tmp = np.mean(maes_n[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.median(maes_n[i, :, :, :], axis=1).flatten('F')
 #    tmp = np.reshape(tmp, [1, np.size(tmp)])
 #    vec = np.concatenate((vec, tmp), axis=0)
 #  else:
-#    tmp = np.mean(maes_n[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.median(maes_n[i, :, :, :], axis=1).flatten('F')
 #    tmp = np.reshape(tmp, [1, np.size(tmp)])
 #    vec = tmp
 #
-#  tmp = np.mean(rmses_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(rmses_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(mapes_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(mapes_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(r2_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(r2_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(r_n[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(r_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = means_n[i, :, :].flatten('F')
+#  tmp = np.median(means_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = stds_n[i, :, :].flatten('F')
+#  tmp = np.median(stds_n[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
@@ -755,35 +760,35 @@ no2_figs, no2_names, o3_figs, o3_names = regress.regress_df(target_df,
 #for i in xrange(np.shape(r_o)[0]):
 #  if coeffs_o is not None:
 #    vec = coeffs_o[i]
-#    tmp = np.mean(maes_o[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.median(maes_o[i, :, :, :], axis=1).flatten('F')
 #    tmp = np.reshape(tmp, [1, np.size(tmp)])
 #    vec = np.concatenate((vec, tmp), axis=0)
 #  else:
-#    tmp = np.mean(maes_o[i, :, :, :], axis=1).flatten('F')
+#    tmp = np.median(maes_o[i, :, :, :], axis=1).flatten('F')
 #    tmp = np.reshape(tmp, [1, np.size(tmp)])
 #    vec = tmp
 #
-#  tmp = np.mean(rmses_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(rmses_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(mapes_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(mapes_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(r2_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(r2_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = np.mean(r_o[i, :, :, :], axis=1).flatten('F')
+#  tmp = np.median(r_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = means_o[i, :, :].flatten('F')
+#  tmp = np.median(means_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #
-#  tmp = stds_o[i, :, :].flatten('F')
+#  tmp = np.median(stds_o[i, :, :, :], axis=1).flatten('F')
 #  tmp = np.reshape(tmp, [1, np.size(tmp)])
 #  vec = np.concatenate((vec, tmp), axis=0)
 #

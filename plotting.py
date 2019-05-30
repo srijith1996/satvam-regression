@@ -163,7 +163,7 @@ def plot_xy(x, y, title='', xlabel='', ylabel='', ylim=None, leg_labels=None):
   '''
     Plot on X-Y plane
   '''
-
+  
   fig = plt.figure()
   ax = fig.add_subplot('111')
 
@@ -174,10 +174,10 @@ def plot_xy(x, y, title='', xlabel='', ylabel='', ylim=None, leg_labels=None):
   ax.set_xticks(x)
   ax.grid(b=True, which='major', axis='both',
           color='gray', linestyle='--', alpha=0.5)
-
+  
   ax.grid(b=True, which='minor', axis='both',
           color='gray', linestyle=':', alpha=0.3)
-
+  
   if len(y.shape) == 1:
     y = np.reshape(y, [np.size(y), 1])
 
@@ -282,23 +282,97 @@ def compare_ts_plot(epochs, y1, y2, title='', ylabel='',
     ids = range(1, np.size(Y, axis=1)+1)
 
   # plot residuals and temperatures
-  handle_1 = ax.scatter(epochs, y1, alpha=0.4, marker='.',
-                        linewidths=0.2, color=colorWheel[ids[0]])
-  handle_2 = ax2.scatter(epochs, y2, alpha=0.4, marker='.',
-                         linewidths=0.2, color=colorWheel[ids[1]])
+  handles = []
+  for y in y1.T:
+    handle_1 = ax.scatter(epochs, y1, alpha=0.4, marker='.',
+                          linewidths=0.2, color=colorWheel[ids[0]])
+    handles.append(handle_1)
+  for y in y2.T:
+    handle_2 = ax2.scatter(epochs, y2, alpha=0.4, marker='.',
+                           linewidths=0.2, color=colorWheel[ids[1]])
+    handles.append(handle_2)
 
   # legend
   if leg_labels != None:
-    ax.legend(handles=[handle_1, handle_2], labels=leg_labels,
+    ax.legend(handles=handles, labels=leg_labels,
               loc=3)
 
   return fig, ax
 # ------------------------------------------------------------------------------
-def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto',
-                x_tick_labels=[]):
+def plot_violin(X, title="", xlabel="", ylabel="", scale='auto',
+                x_tick_labels=[], groups=None, group_labels=None,
+                mark_maxoutliers=True, leg=False):
+  '''
+    Plot violins of different columns of X
+
+    Params:
+      X              - vector whose columns are plotted
+      title          - Title of plot
+      xlabel, ylabel - Axes labels
+      scale          - 'auto' or list of two integers
+      x_tick_labels  - tick labels for X
+      groups         - list of integers
+      group_labels   - labels for each group
+      mark_maxoutliers - mark the maxima of violins cut off due to scale
+                         on the top
+
+    Return:
+      fig, ax   - figure and axes with violins and labels
+  '''
+
+  islist = False
+  if isinstance(X, list):
+    if len(X) > 0:
+      if not isinstance(X[0], list):
+        X = np.array(X)
+      else:
+        islist = True
+    else:
+      return
+
+  print islist
+
+  if not islist and X.ndim == 1:
+    X = X[:, np.newaxis]
+
+  num_violins = len(X) if islist else X.shape[1]
+  if groups is None:
+    groups = [num_violins]
+    group_labels = ['']
+  else:
+    if isinstance(groups, list):
+      assert len(groups) == len(group_labels)
+      assert np.sum(groups) == num_violins
+    else:
+      assert num_violins % groups == 0
+      assert len(groups) == num_violins / groups
+      groups = np.repeat(groups, num_violins/groups)
+
+  even_groups = all([(group == groups[0]) for group in groups])
+  label_size_match = np.size(x_tick_labels) == np.sum(groups)
+
+  if len(x_tick_labels) == 0:
+    for grsize in groups:
+      x_tick_labels.append(range(1, grsize + 1))
+
+  x_tick_labels = np.array(x_tick_labels)
+
+  same_subgroups = False
+  if not even_groups:
+    assert label_size_match
+  else:
+    if not label_size_match:
+      same_subgroups = True
+      x_tick_labels = np.repeat(x_tick_labels[np.newaxis, :],
+                                num_violins/groups[0], axis=0)
+
+  # normal font size
+  fs_norm = 12
 
   pos = []
-  if X.ndim == 1:
+  if islist:
+    pos = range(0, len(X))
+  elif X.ndim == 1:
     pos.append(1)
   else:
     for i in range(0, np.size(X, 1)):
@@ -306,75 +380,176 @@ def plot_violin(X, title="violin plot", xlabel="", ylabel="", scale='auto',
 
   means = []
   medians = []
+  maxm = []
 
-  if X.ndim == 1:
+  if islist:
+    for vio in X:
+      means.append(np.mean(vio))
+      medians.append(np.median(vio))
+      maxm.append(np.max(vio))
+  elif X.ndim == 1:
     means.append(np.mean(X))
-    medians.append(np.median(X))
+    median.append(np.median(X))
+    maxm.append(np.max(X))
   else:
     for data in X.T:
       means.append(np.mean(data))
       medians.append(np.median(data))
+      maxm.append(np.max(data))
 
+  print maxm
+  # create figure
+  fig=plt.figure(figsize=(10,8))
+  ax = fig.add_subplot(111)
+
+  # scale the plots
+  if scale != 'auto':
+    if scale == 'log':
+      plt.yscale(scale)
+    else:
+      ax.set_ylim(scale)
+
+  
   def autolabel():
     """
     Attach a text label above each bar displaying its height
     """
+    pad = 1.20
     for i in range(0,len(pos)):
       va_mean = 'bottom'
       va_median = 'top'
 
+      rotation ='0'
+      fontsize=22
       if means[i] < medians[i]:
         va_mean = 'top'
         va_median = 'bottom'
 
-      ax.text(pos[i]+0.20, means[i],
-              '%.4f' % means[i],
-              ha='center', va=va_mean, color='red')
-      ax.text(pos[i]+0.20, medians[i],
-              '%.4f' % medians[i],
-              ha='center', va=va_median,color='green')
+      ht_median = medians[i]
 
-  fig=plt.figure(figsize=(10,7))
-  ax = fig.add_subplot(111)
-  
-  plt.grid()
-  ax.yaxis.grid(b=True, which='minor', color='g', linestyle='-', alpha=0.2)
-  #plt.minorticks_on()
+      # bounds for height
+      if scale != 'auto':
+        if scale[0] + pad > ht_median:
+          ht_median = scale[0] + pad
+          va_median = 'bottom'
+          rotation='90'
+          fontsize=20
+          
+        if scale[1] < ht_median + pad:
+          ht_median = scale[1] - pad
+          va_median = 'top'
+          rotation='90'
+          fontsize=20
 
-  plt.tick_params(labelsize=13)
+      #ax.text(pos[i]+0.1, means[i],
+      #        '%.3g' % means[i],
+      #        ha='center', va=va_mean, color='darkred', fontsize=15)
+      ax.text(pos[i]+0.1, ht_median,
+              '%.3g' % medians[i],
+              ha='left', va=va_median, color='darkgreen',
+              rotation=rotation, fontsize=fs_norm-3)
 
-  parts = ax.violinplot(X, pos, points=20, widths=0.4,
+      if scale != 'auto' and mark_maxoutliers:
+        if scale[1] < maxm[i] + pad and medians[i]  + pad < scale[1]:
+          ax.text(pos[i]+0.20, scale[1] - pad,
+                  '%.3g' % maxm[i],
+                  ha='center', va='top', color='darkblue',
+                  rotation='0', fontsize=fs_norm-5)
+
+  #plt.tight_layout()
+  plt.subplots_adjust(bottom=0.18, right=0.97, top=0.97, left=0.09)
+
+  res = ax.violinplot(X, pos, points=20, widths=0.85,
              showmeans=True, showextrema=True, showmedians=True)
 
   autolabel()
   #x_tick_labels = ['Bandwidth (Mbits/sec)']
-  parts['cmeans'].set_edgecolor('darkred')
-  parts['cmedians'].set_edgecolor('darkgreen')
 
-  ax.set_xticks(pos)
+  # set colors for components
+  lwidth = 0.85
+  res['cmeans'].set(edgecolor='darkred', linewidth=1.2, label='mean')
+  res['cmedians'].set(edgecolor='darkgreen', linewidth=1.2, label='median')
+  res['cbars'].set(edgecolor='black', linewidth=lwidth, alpha=0.65)
+  res['cmins'].set(edgecolor='black', linewidth=lwidth, alpha=0.75)
+  res['cmaxes'].set(edgecolor='darkblue', linewidth=lwidth, alpha=0.75)
+
+  if same_subgroups and len(groups) > 1:
+    for i, lobe in enumerate(res['bodies']):
+      lobe.set(color=colorWheel[(i % groups[0]) + 5], alpha=0.75)
+  else:
+    for i, lobe in enumerate(res['bodies']):
+      lobe.set(alpha=0.55)
+
   
   # set ticklabels
-  if len(x_tick_labels) == 0:
-    ax.set_xticklabels([(x + 1)/2 for x in pos])
-  else:
-    ax.set_xticklabels(x_tick_labels, rotation='0', fontsize=13)
+  ax.set_xticks(pos)
+  ax.set_xticklabels(x_tick_labels.flatten(), rotation='0')
+  ax.tick_params(axis='y', labelsize=fs_norm-3)
+  ax.tick_params(axis='x', labelsize=fs_norm-4)
+  ax.tick_params(axis='y', which='minor', bottom=False)
+  res = [t.set_y(0) for t in ax.get_xticklabels()]
 
-  if X.ndim > 1:
-    ax.set_xlim([0,2*np.size(X, 1)])
-    legend = ax.legend(loc='upper right', shadow=True, fontsize='small')
-
-  ax.set_xlabel(xlabel, fontsize=15)
-  ax.set_ylabel(ylabel, fontsize=15)
-  ax.set_title(title, fontsize=15)
 
   if scale != 'auto':
-    ax.set_ylim(scale)
+    if scale == 'log':
+      plt.yscale(scale)
+    else:
+      ax.set_ylim(scale)
 
-  custom_lines = [Line2D([0], [0], color='red', lw=1.5),
-                Line2D([0], [0], color='green', lw=1.5)]
 
-  ax.legend(custom_lines, ['Mean', 'Median'],shadow='True',
-            fontsize=13,ncol=1,loc='upper left')  
+  # set group labels on x axis
+  pos = np.zeros(2, dtype=int)
+  loc = ax.get_xticks()
+  bottom, top = ax.get_ylim()
+  axloc = ax.get_position().bounds[:2]
+  corr_align = [.01, -.03, -.03]
+  #ticklab_pos = ax.get_xticklabels()[0].get_position()[1]
+  #ticklab_pos += (ax.get_ylim()[0] - ax.get_ylim()[1]) / 20
+  for (group, gl, corr) in zip(groups, group_labels, corr_align):
+    pos[0] = pos[1]
+    pos[1] = pos[0] + group
+
+    set_break = False
+    if pos[1] >= len(loc):
+      pos[1] -= 1
+      set_break = True
+
+    #print ticklab_pos
+    x = (2*axloc[0] + loc[pos[0]] + loc[pos[1]]) / (2.0 * (loc[-1] - loc[0]) + 4)
+    #gl = r'\textbf{%s}' % gl
+    plt.figtext(x+corr, 0.005, gl, ha='center', va='bottom', fontsize=fs_norm-3)
+
+    if set_break:
+      break
+
+    # boundary for each group
+    line_loc = (loc[pos[1]] + loc[pos[1] - 1]) / 2
+    bdy_line = Line2D([line_loc, line_loc], [top, bottom], color='black',
+                      lw=1.2, linestyle='-')
+    ax.add_line(bdy_line)
+
+
+  #if X.ndim > 1:
+  #  ax.set_xlim([0,2*np.size(X, 1)])
+  #  legend = ax.legend(loc='upper right', shadow=True, fontsize='small')
+
+  ax.set_xlabel(xlabel, fontsize=fs_norm-2)
+  ax.set_ylabel(ylabel, fontsize=fs_norm-2)
+  ax.set_title(title, fontsize=fs_norm)
+
+  custom_lines = [Line2D([0], [0], color='darkred', lw=1.2),
+                  Line2D([0], [0], color='darkgreen', lw=1.2),
+                  Line2D([0], [0], color='darkblue', lw=1.2)]
+
+  if leg == True:
+    ax.legend(handles=custom_lines, labels=['mean', 'median', 'max'], shadow=False,
+              fontsize=fs_norm-4,ncol=1,loc=(0.01, 0.01), framealpha=0.65)
+
+  plt.grid()
+  plt.minorticks_on()
+  ax.yaxis.grid(b=True, which='minor', color='gray', linestyle='--', lw=0.5, alpha=0.5)
+  ax.yaxis.grid(b=True, which='major', color='gray', linestyle='-', lw=0.8, alpha=1)
+  ax.xaxis.grid(b=True, which='major', color='gray', linestyle='-', lw=0.8, alpha=1)
 
   return fig, ax
 # ------------------------------------------------------------------------------
@@ -418,12 +593,13 @@ def plot_err_dist(true_val, pred, num_bins=40, pad=0.3,
     lens[i] = np.size(true_val[[(val >= bin_edges[i]
                             and val < bin_edges[i+1]) for val in true_val]])
 
-  fig, ax = plotting.plot_stem(mean, mean_err,
+  fig, ax = plot_stem(mean, mean_err,
               title=title, xlabel=xlabel,
               ylabel=r'\textit{Mean Absolute Percentage Error}')
-
+ 
   for i in xrange(num_bins):
-    ax.annotate('%d' % lens[i], xy=(mean[i], mean_err[i] + pad), rotation = 80, alpha=0.8,
+    y = min(mean_err[i] + pad, ax.get_ylim()[1])
+    ax.annotate('%d' % lens[i], xy=(mean[i], y), rotation = 80, alpha=0.8,
                 fontsize='small')
 
   return fig
