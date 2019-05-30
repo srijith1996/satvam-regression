@@ -7,8 +7,8 @@ font.sans-serif: Helvetica, Avant Garde, Computer Modern Sans serif
 font.cursive: Zapf Chancery
 font.monospace: Courier, Computer Modern Typewriter
 text.usetex: True
-figure.autolayout: True
-figure.figsize: 11,7
+#figure.autolayout: True
+figure.figsize: 11,8
 axes.titlesize: 17
 axes.labelsize: 15
 lines.linewidth: 2
